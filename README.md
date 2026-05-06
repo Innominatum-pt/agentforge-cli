@@ -108,23 +108,43 @@ Before using the deployment commands, make sure to add your GoClaw Bearer Token 
 ```json
 {
   "goclaw": {
-    "api_url": "http://your-server:8080",
+    "api_url": "http://localhost:18790",
     "token": "YOUR_BEARER_TOKEN",
+    "default_provider": "ollama cloud",
+    "default_model": "deepseek-v4-pro",
     "skills_import_endpoint": "/v1/skills/import",
     "skills_export_endpoint": "/v1/skills/export"
   }
 }
 ```
 
+#### Deploying Skills
 ```bash
 agentforge deploy skill <slug>
 ```
-Automatically builds your skill into a `.zip` file and securely uploads it to your GoClaw server via the Import API. The server will calculate the hash of the markdown to determine if a new version needs to be created.
+Automatically builds your skill into a `.zip` file and securely uploads it to your GoClaw server via the Import API.
 
+#### Deploying Agents
+```bash
+agentforge deploy context <slug>
+```
+**Hot Reload for Context:** Fast-path deployment that reads all local `.md`, `.txt`, and `.py` files in your agent folder and uploads them directly to the agent's mind on the server. Perfect for iterating on prompts.
+
+```bash
+agentforge deploy agent <slug>
+```
+**Full Deployment:** Reads the local `agent.json` to create a new agent or update an existing one (e.g., updating the LLM model). Then, it automatically synchronizes all context files.
+
+#### Sincronization (Pull)
 ```bash
 agentforge pull skills
 ```
-Connects to your GoClaw server, downloads the latest backup archive of all existing skills (`.tar.gz`), and natively extracts them into your local `skills/` directory.
+Downloads the latest backup archive of all skills and extracts them locally.
+
+```bash
+agentforge pull agents
+```
+Downloads all agents from the GoClaw server. It performs a **surgical extraction**, ignoring logs, user sessions, and memory, retrieving only the core `agent.json` and `context_files/` to keep your workspace perfectly clean.
 
 ---
 

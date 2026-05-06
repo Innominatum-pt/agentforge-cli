@@ -54,9 +54,11 @@ program
       workspace: "agentforge",
       version: 1,
       goclaw: {
-        api_url: "http://localhost:8080",
+        api_url: "http://localhost:18790",
         username: "system",
         token: "",
+        default_provider: "ollama-cloud",
+        default_model: "deepseek-v4-pro",
         skills_import_endpoint: "/v1/skills/import",
         skills_export_endpoint: "/v1/skills/export"
       }
@@ -112,12 +114,50 @@ newCmd
 
     if (sourceTemplatePath !== "") {
       await fs.copy(sourceTemplatePath, agentPath);
+      
+      try {
+        const config = await getConfig();
+        const agentJson = {
+          agent_key: slug,
+          display_name: name,
+          agent_type: "custom",
+          provider: config.goclaw?.default_provider || "ollama cloud",
+          model: config.goclaw?.default_model || "deepseek-v4-pro",
+          other_config: {
+              description: `Agent ${name} created by AgentForge`
+          }
+        };
+        await fs.writeJson(path.join(agentPath, "agent.json"), agentJson, { spaces: 2 });
+      } catch (err) {
+        // Fallback se não conseguir ler config
+      }
+      
       console.log(`✅ Agente "${name}" criado com sucesso em agents/${slug} usando templates!`);
     } else {
-      console.warn("⚠️ Nenhuma pasta de templates encontrada. Criando apenas um README.md básico.");
+      console.warn("⚠️ Nenhuma pasta de templates encontrada. Criando estrutura básica...");
+      
+      try {
+        const config = await getConfig();
+        const agentJson = {
+          agent_key: slug,
+          display_name: name,
+          agent_type: "custom",
+          provider: config.goclaw?.default_provider || "ollama cloud",
+          model: config.goclaw?.default_model || "deepseek-v4-pro",
+          other_config: {
+              description: `Agent ${name} created by AgentForge`
+          }
+        };
+        await fs.writeJson(path.join(agentPath, "agent.json"), agentJson, { spaces: 2 });
+      } catch (err) {}
+      
       await fs.writeFile(
-        path.join(agentPath, "README.md"),
+        path.join(agentPath, "SOUL.md"),
         `# ${name}\n\nAgente criado pela AgentForge CLI.\n`
+      );
+      await fs.writeFile(
+        path.join(agentPath, "HEARTBEAT.md"),
+        `# Instruções de Heartbeat\n`
       );
       console.log(`✅ Agente "${name}" criado com sucesso em agents/${slug}.`);
     }
@@ -247,7 +287,7 @@ deployCmd
       const response = await axios.post(url, form, {
         headers: {
           ...form.getHeaders(),
-          Authorization: `Bearer ${config.goclaw.token}`
+          Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
         }
       });
       console.log("✅ Deploy realizado com sucesso!");
@@ -262,9 +302,128 @@ deployCmd
     }
   });
 
-program
+deployCmd
+  .command("context <slug>")
+  .description("Faz upload dos arquivos de contexto (.md, .txt) diretamente para o agente")
+  .action(async (slug: string) => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      process.exit(1);
+    }
+    
+    const basePath = getWorkspaceRoot();
+    const agentPath = path.join(basePath, "agents", slug);
+    if (!(await fs.pathExists(agentPath))) {
+      console.error(`❌ Agente não encontrado em agents/${slug}`);
+      process.exit(1);
+    }
+
+    console.log(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
+    
+    const files = await fs.readdir(agentPath);
+    for (const file of files) {
+      if (file === "agent.json" || file === "README.md") continue;
+      
+      const filePath = path.join(agentPath, file);
+      const stat = await fs.stat(filePath);
+      if (stat.isFile()) {
+        const content = await fs.readFile(filePath, "utf-8");
+        const url = `${config.goclaw.api_url}/v1/agents/${slug}/files/${file}`;
+        try {
+          await axios.put(url, content, {
+            headers: {
+              "Content-Type": "text/plain",
+              Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
+            }
+          });
+          console.log(`✅ Upload: ${file}`);
+        } catch (error: any) {
+          console.error(`❌ Erro ao enviar ${file}:`, error.response?.data || error.message);
+        }
+      }
+    }
+    console.log("✅ Deploy de contexto concluído!");
+  });
+
+deployCmd
+  .command("agent <slug>")
+  .description("Faz deploy completo do agente (configuração + arquivos de contexto)")
+  .action(async (slug: string) => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      process.exit(1);
+    }
+
+    const basePath = getWorkspaceRoot();
+    const agentPath = path.join(basePath, "agents", slug);
+    const agentJsonPath = path.join(agentPath, "agent.json");
+
+    if (!(await fs.pathExists(agentJsonPath))) {
+      console.error(`❌ agent.json não encontrado em agents/${slug}.`);
+      process.exit(1);
+    }
+
+    const agentConfig = await fs.readJson(agentJsonPath);
+    console.log(`🚀 Atualizando configuração do agente "${slug}"...`);
+    
+    try {
+      let exists = true;
+      try {
+         await axios.get(`${config.goclaw.api_url}/v1/agents/${slug}`, {
+           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+         });
+      } catch (e: any) {
+         if (e.response && e.response.status === 404) {
+           exists = false;
+         } else {
+           throw e;
+         }
+      }
+
+      if (!exists) {
+         await axios.post(`${config.goclaw.api_url}/v1/agents`, agentConfig, {
+           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+         });
+         console.log("✅ Agente criado com sucesso.");
+      } else {
+         await axios.put(`${config.goclaw.api_url}/v1/agents/${slug}`, agentConfig, {
+           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+         });
+         console.log("✅ Configurações do agente atualizadas.");
+      }
+    } catch (error: any) {
+      console.error(`❌ Erro no deploy da configuração:`, error.response?.data || error.message);
+      return;
+    }
+
+    const files = await fs.readdir(agentPath);
+    for (const file of files) {
+      if (file === "agent.json" || file === "README.md") continue;
+      const filePath = path.join(agentPath, file);
+      const stat = await fs.stat(filePath);
+      if (stat.isFile()) {
+        const content = await fs.readFile(filePath, "utf-8");
+        const url = `${config.goclaw.api_url}/v1/agents/${slug}/files/${file}`;
+        try {
+          await axios.put(url, content, {
+            headers: { "Content-Type": "text/plain", Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+          });
+          console.log(`✅ Upload: ${file}`);
+        } catch (error: any) {
+          console.error(`❌ Erro ao enviar ${file}:`, error.response?.data || error.message);
+        }
+      }
+    }
+    console.log("✅ Deploy completo concluído!");
+  });
+
+const pullCmd = program
   .command("pull")
-  .description("Sincroniza entidades do GoClaw para o workspace local")
+  .description("Sincroniza entidades do GoClaw para o workspace local");
+
+pullCmd
   .command("skills")
   .description("Faz download do arquivo tar.gz de skills do GoClaw e extrai localmente")
   .action(async () => {
@@ -279,7 +438,7 @@ program
       const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
       const response = await axios.get(url, {
         headers: {
-          Authorization: `Bearer ${config.goclaw.token}`
+          Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
         },
         responseType: "stream"
       });
@@ -308,6 +467,73 @@ program
       } else {
         console.error(error.message);
       }
+    }
+  });
+
+pullCmd
+  .command("agents")
+  .description("Faz download cirúrgico dos agentes (configuração e contexto)")
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
+      process.exit(1);
+    }
+
+    console.log("📥 Buscando lista de agentes do GoClaw...");
+    try {
+      const listResponse = await axios.get(`${config.goclaw.api_url}/v1/agents`, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+      });
+      
+      const agents = listResponse.data.agents || [];
+      console.log(`Encontrados ${agents.length} agentes. Sincronizando...`);
+
+      for (const agent of agents) {
+        const slug = agent.agent_key;
+        console.log(`📦 Baixando agente: ${slug}...`);
+        
+        const url = `${config.goclaw.api_url}/v1/agents/${agent.id}/export`;
+        const response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
+          responseType: "stream"
+        });
+
+        const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
+        const writer = fs.createWriteStream(tempTarPath);
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+          writer.on("finish", resolve);
+          writer.on("error", reject);
+        });
+
+        const agentPath = path.join(getWorkspaceRoot(), "agents", slug);
+        await fs.ensureDir(agentPath);
+
+        await tar.x({
+          file: tempTarPath,
+          cwd: agentPath,
+          strip: 0, 
+          filter: (path) => {
+            return path === 'agent.json' || path.startsWith('context_files/');
+          }
+        });
+        
+        const contextDir = path.join(agentPath, "context_files");
+        if (await fs.pathExists(contextDir)) {
+          const contextFiles = await fs.readdir(contextDir);
+          for (const f of contextFiles) {
+            await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+          }
+          await fs.remove(contextDir);
+        }
+
+        await fs.remove(tempTarPath);
+      }
+      console.log("✅ Pull de agentes concluído com sucesso!");
+    } catch (error: any) {
+      console.error("❌ Erro durante o pull dos agentes:", error.response?.data || error.message);
     }
   });
 
