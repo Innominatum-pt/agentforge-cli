@@ -217,12 +217,12 @@ const buildCmd = program
 
 buildCmd
   .command("skill <slug>")
-  .description("Empacota uma skill em um arquivo .zip na pasta exports/")
+  .description("Empacota uma skill em um arquivo .tar.gz na pasta exports/")
   .action(async (slug: string) => {
     const basePath = getWorkspaceRoot();
     const skillPath = path.join(basePath, "skills", slug);
     const exportsPath = path.join(basePath, "exports");
-    const zipPath = path.join(exportsPath, `${slug}.zip`);
+    const tarPath = path.join(exportsPath, `${slug}.tar.gz`);
 
     if (!(await fs.pathExists(skillPath))) {
       console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
@@ -231,11 +231,13 @@ buildCmd
 
     await fs.ensureDir(exportsPath);
 
-    const zip = new AdmZip();
-    zip.addLocalFolder(skillPath);
-    zip.writeZip(zipPath);
+    await tar.c({
+      gzip: true,
+      file: tarPath,
+      cwd: path.join(basePath, "skills")
+    }, [slug]);
 
-    console.log(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
+    console.log(`✅ Build concluído: ${slug}.tar.gz salvo na pasta exports/`);
   });
 
 async function getConfig() {
@@ -269,7 +271,7 @@ deployCmd
     const basePath = getWorkspaceRoot();
     const skillPath = path.join(basePath, "skills", slug);
     const exportsPath = path.join(basePath, "exports");
-    const zipPath = path.join(exportsPath, `${slug}.zip`);
+    const tarPath = path.join(exportsPath, `${slug}.tar.gz`);
 
     if (!(await fs.pathExists(skillPath))) {
       console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
@@ -277,14 +279,17 @@ deployCmd
     }
     
     await fs.ensureDir(exportsPath);
-    const zip = new AdmZip();
-    zip.addLocalFolder(skillPath);
-    zip.writeZip(zipPath);
-    console.log(`✅ Build concluído: ${slug}.zip preparado para envio.`);
+    await tar.c({
+      gzip: true,
+      file: tarPath,
+      cwd: path.join(basePath, "skills")
+    }, [slug]);
+    
+    console.log(`✅ Build concluído: ${slug}.tar.gz preparado para envio.`);
 
     console.log(`🚀 Fazendo upload para o GoClaw...`);
     const form = new FormData();
-    form.append("file", fs.createReadStream(zipPath));
+    form.append("file", fs.createReadStream(tarPath));
 
     try {
       const url = `${config.goclaw.api_url}${config.goclaw.skills_import_endpoint || '/v1/skills/import'}`;
