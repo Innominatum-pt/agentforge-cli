@@ -533,7 +533,11 @@ pullCmd
       }
       console.log("✅ Pull de agentes concluído com sucesso!");
     } catch (error: any) {
-      console.error("❌ Erro durante o pull dos agentes:", error.response?.data || error.message);
+      if (error.response && error.response.status) {
+        console.error(`❌ Erro durante o pull dos agentes: HTTP ${error.response.status} - Verifique suas credenciais e permissões no agentforge.json (username deve ser o dono do agente).`);
+      } else {
+        console.error("❌ Erro durante o pull dos agentes:", error.message);
+      }
     }
   });
 
