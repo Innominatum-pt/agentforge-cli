@@ -56,7 +56,6 @@ program
 
     const folders = [
       "agents",
-      "teams",
       "documents",
       "templates/default-agent",
       "exports"

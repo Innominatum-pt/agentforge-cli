@@ -26,7 +26,6 @@ my-ai-agents/
 ├── documents/           # Reference documentation for your AI assistants
 ├── exports/             # Where built files are stored for deployment
 ├── skills/              # Where your local skills will live
-├── teams/               # Where your AI teams will live
 └── templates/           # Customizable templates for your Agents and Skills
 ```
 
