@@ -8,6 +8,22 @@ import AdmZip from "adm-zip";
 import FormData from "form-data";
 import * as tar from "tar";
 import axios from "axios";
+import * as readline from "readline";
+
+function confirmOverwrite(entityType: string): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise(resolve => {
+    rl.question(`⚠️ Atenção: O pull irá sobrescrever as suas ${entityType} locais. Quaisquer alterações não publicadas serão perdidas. Deseja continuar? (s/N) `, answer => {
+      rl.close();
+      const isYes = answer.toLowerCase() === 's' || answer.toLowerCase() === 'sim' || answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
+      resolve(isYes);
+    });
+  });
+}
 
 function getWorkspaceRoot(): string {
   let dir = process.cwd();
@@ -295,8 +311,10 @@ deployCmd
           Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
         }
       });
-      console.log("✅ Deploy realizado com sucesso!");
-      console.log(response.data);
+      const data = response.data;
+      if (data && data.version) {
+        console.log(`📌 Skill atualizada para a versão ${data.version}.`);
+      }
     } catch (error: any) {
       console.error("❌ Erro durante o deploy:");
       if (error.response) {
@@ -447,6 +465,11 @@ pullCmd
       process.exit(1);
     }
 
+    if (!(await confirmOverwrite("skills"))) {
+      console.log("❌ Pull cancelado pelo utilizador.");
+      return;
+    }
+
     console.log("📥 Baixando skills do GoClaw...");
     try {
       const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
@@ -531,6 +554,11 @@ pullCmd
     if (!config.goclaw || !config.goclaw.token) {
       console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
       process.exit(1);
+    }
+
+    if (!(await confirmOverwrite("agentes"))) {
+      console.log("❌ Pull cancelado pelo utilizador.");
+      return;
     }
 
     console.log("📥 Buscando lista de agentes do GoClaw...");
