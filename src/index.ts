@@ -470,8 +470,35 @@ pullCmd
         file: tempTarPath,
         cwd: getWorkspaceRoot() 
       });
-
       await fs.remove(tempTarPath);
+
+      console.log("📥 Baixando ficheiros de código das skills...");
+      const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+      });
+      
+      const skills = skillsListRes.data.skills || [];
+      for (const skill of skills) {
+        try {
+          const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
+            headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+          });
+          
+          const files = filesRes.data.files || [];
+          for (const file of files) {
+            if (file.isDir) continue;
+            const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
+              headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+            });
+            const filePath = path.join(getWorkspaceRoot(), "skills", skill.slug, file.path);
+            await fs.ensureDir(path.dirname(filePath));
+            await fs.writeFile(filePath, fileContentRes.data.content || "");
+          }
+        } catch (fileErr: any) {
+          console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
+        }
+      }
+
       console.log("✅ Pull concluído com sucesso! As skills foram atualizadas localmente.");
     } catch (error: any) {
       console.error("❌ Erro durante o pull das skills:");
