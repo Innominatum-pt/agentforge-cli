@@ -245,7 +245,11 @@ async function getConfig() {
     console.error("❌ Arquivo agentforge.json não encontrado. Execute 'agentforge init' primeiro.");
     process.exit(1);
   }
-  return await fs.readJson(configPath);
+  const config = await fs.readJson(configPath);
+  if (config.goclaw && config.goclaw.api_url) {
+    config.goclaw.api_url = config.goclaw.api_url.replace(/\/$/, "");
+  }
+  return config;
 }
 
 const deployCmd = program
