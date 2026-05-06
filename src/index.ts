@@ -728,7 +728,7 @@ pullCmd
             await fs.ensureDir(path.dirname(filePath));
             await fs.writeFile(filePath, fileContentRes.data.content || '');
           }
-        } catch (fileErr) {
+        } catch (fileErr: any) {
           console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
         }
       }
