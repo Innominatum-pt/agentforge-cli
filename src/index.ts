@@ -480,6 +480,18 @@ pullCmd
       const skills = skillsListRes.data.skills || [];
       for (const skill of skills) {
         try {
+          const isSystem = skill.is_system === true;
+          const targetFolder = isSystem ? path.join("system", skill.slug) : skill.slug;
+          
+          if (isSystem) {
+            const originalPath = path.join(getWorkspaceRoot(), "skills", skill.slug);
+            const newPath = path.join(getWorkspaceRoot(), "skills", targetFolder);
+            if (await fs.pathExists(originalPath)) {
+              await fs.ensureDir(path.dirname(newPath));
+              await fs.move(originalPath, newPath, { overwrite: true });
+            }
+          }
+
           const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
             headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
           });
@@ -490,7 +502,7 @@ pullCmd
             const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
               headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
             });
-            const filePath = path.join(getWorkspaceRoot(), "skills", skill.slug, file.path);
+            const filePath = path.join(getWorkspaceRoot(), "skills", targetFolder, file.path);
             await fs.ensureDir(path.dirname(filePath));
             await fs.writeFile(filePath, fileContentRes.data.content || "");
           }
