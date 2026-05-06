@@ -31,32 +31,59 @@ my-ai-agents/
 
 ---
 
-## Commands Reference
+## Commands
 
-### Init
+### Workspace Sync
+When you clone a repository or set up a new workspace, you can synchronize all remote assets to your local machine at once.
+
 ```bash
-agentforge init
+agentforge pull all
 ```
-Initializes the current directory as an AgentForge workspace. It creates the base folders, copies default templates, and generates an `agentforge.json` config file.
+Downloads all agents and skills from the GoClaw server. It performs a **surgical extraction**, retrieving only the core `agent.json`, `context_files/`, and skill definitions to keep your workspace perfectly clean. Note: This will ask for confirmation before overwriting local files.
 
-### Agents
+### Agent Management
 ```bash
 agentforge new agent "<Agent Name>"
 ```
 Creates a new agent inside the `agents/` directory using the files found in `templates/default-agent/`. If the name contains spaces, remember to wrap it in quotes. The CLI will automatically slugify the folder name (e.g., `agents/my-super-agent/`).
 
-### Skills
+```bash
+agentforge pull agents
+```
+Downloads all agents from the GoClaw server and extracts them locally.
+
+```bash
+agentforge deploy agent <slug>
+```
+**Full Deployment:** Reads the local `agent.json` to create a new agent or update an existing one (e.g., updating the LLM model). Then, it automatically synchronizes all context files.
+
+```bash
+agentforge deploy context <slug>
+```
+**Hot Reload for Context:** Fast-path deployment that reads all local `.md`, `.txt`, and `.py` files in your agent folder and uploads them directly to the agent's mind on the server. Perfect for iterating on prompts.
+
+### Skill Management
 ```bash
 agentforge new skill "<Skill Name>"
 ```
 Creates a new skill inside the `skills/` directory using the template from `templates/default-skill/SKILL.md`.
 
 ```bash
+agentforge pull skills
+```
+Downloads the latest backup archive of all skills and extracts them locally.
+
+```bash
 agentforge build skill <slug>
 ```
 Packages the skill folder into a `.zip` file ready for GoClaw deployment. The resulting archive is saved in the `exports/` folder.
 
-### API & Deployment
+```bash
+agentforge deploy skill <slug>
+```
+Automatically builds your skill into a `.zip` file and securely uploads it to your GoClaw server via the Upload API.
+
+### Configuration
 Before using the deployment commands, make sure to add your GoClaw Bearer Token to the `agentforge.json` file located at the root of your workspace:
 
 ```json
@@ -69,31 +96,3 @@ Before using the deployment commands, make sure to add your GoClaw Bearer Token 
   }
 }
 ```
-
-#### Deploying Skills
-```bash
-agentforge deploy skill <slug>
-```
-Automatically builds your skill into a `.zip` file and securely uploads it to your GoClaw server via the Upload API.
-
-#### Deploying Agents
-```bash
-agentforge deploy context <slug>
-```
-**Hot Reload for Context:** Fast-path deployment that reads all local `.md`, `.txt`, and `.py` files in your agent folder and uploads them directly to the agent's mind on the server. Perfect for iterating on prompts.
-
-```bash
-agentforge deploy agent <slug>
-```
-**Full Deployment:** Reads the local `agent.json` to create a new agent or update an existing one (e.g., updating the LLM model). Then, it automatically synchronizes all context files.
-
-#### Sincronization (Pull)
-```bash
-agentforge pull skills
-```
-Downloads the latest backup archive of all skills and extracts them locally. Note: This will overwrite local files.
-
-```bash
-agentforge pull agents
-```
-Downloads all agents from the GoClaw server. It performs a **surgical extraction**, ignoring logs, user sessions, and memory, retrieving only the core `agent.json` and `context_files/` to keep your workspace perfectly clean. Note: This will overwrite local files.

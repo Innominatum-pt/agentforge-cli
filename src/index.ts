@@ -656,4 +656,150 @@ pullCmd
     }
   });
 
+
+pullCmd
+  .command('all')
+  .description('Faz download cirúrgico de todos os agentes e skills do GoClaw para a pasta local')
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error('❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.');
+      process.exit(1);
+    }
+    
+    if (!(await confirmOverwrite('TUDO (agentes e skills)'))) {
+      console.log('❌ Pull cancelado pelo utilizador.');
+      return;
+    }
+    
+    console.log('🔄 Iniciando sincronização completa (pull all)...');
+    
+    // PULL SKILLS INLINE
+    console.log('\n--- [1/2] SKILLS ---');
+    try {
+      const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' },
+        responseType: 'stream'
+      });
+
+      const tempTarPath = path.join(getWorkspaceRoot(), 'temp_skills.tar.gz');
+      const writer = fs.createWriteStream(tempTarPath);
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+
+      await tar.x({ file: tempTarPath, cwd: getWorkspaceRoot() });
+      await fs.remove(tempTarPath);
+
+      const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
+      });
+      
+      const skills = skillsListRes.data.skills || [];
+      for (const skill of skills) {
+        try {
+          const isSystem = skill.is_system === true;
+          const targetFolder = isSystem ? path.join('system', skill.slug) : skill.slug;
+          
+          if (isSystem) {
+            const originalPath = path.join(getWorkspaceRoot(), 'skills', skill.slug);
+            const newPath = path.join(getWorkspaceRoot(), 'skills', targetFolder);
+            if (await fs.pathExists(originalPath)) {
+              await fs.ensureDir(path.dirname(newPath));
+              await fs.move(originalPath, newPath, { overwrite: true });
+            }
+          }
+
+          const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
+            headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
+          });
+          
+          const files = filesRes.data.files || [];
+          for (const file of files) {
+            if (file.isDir) continue;
+            const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
+              headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
+            });
+            const filePath = path.join(getWorkspaceRoot(), 'skills', targetFolder, file.path);
+            await fs.ensureDir(path.dirname(filePath));
+            await fs.writeFile(filePath, fileContentRes.data.content || '');
+          }
+        } catch (fileErr) {
+          console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
+        }
+      }
+      console.log('✅ Pull de skills concluído!');
+    } catch (error: any) {
+      console.error('❌ Erro durante o pull das skills:', error.message);
+    }
+    
+    // PULL AGENTS INLINE
+    console.log('\n--- [2/2] AGENTS ---');
+    try {
+      const listResponse = await axios.get(`${config.goclaw.api_url}/v1/agents`, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
+      });
+      
+      const agents = listResponse.data.agents || [];
+      console.log(`Encontrados ${agents.length} agentes. Sincronizando...`);
+
+      for (const agent of agents) {
+        const slug = agent.agent_key;
+        console.log(`📦 Baixando agente: ${slug}...`);
+        
+        const url = `${config.goclaw.api_url}/v1/agents/${agent.id}/export`;
+        const response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' },
+          responseType: 'stream'
+        });
+
+        const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
+        
+        try {
+          const writer = fs.createWriteStream(tempTarPath);
+          response.data.pipe(writer);
+
+          await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+          });
+
+          const agentPath = path.join(getWorkspaceRoot(), 'agents', slug);
+          await fs.ensureDir(agentPath);
+
+          await tar.x({
+            file: tempTarPath,
+            cwd: agentPath,
+            strip: 0, 
+            filter: (path) => {
+              return path === 'agent.json' || path.startsWith('context_files/');
+            }
+          });
+          
+          const contextDir = path.join(agentPath, 'context_files');
+          if (await fs.pathExists(contextDir)) {
+            const contextFiles = await fs.readdir(contextDir);
+            for (const f of contextFiles) {
+              await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+            }
+            await fs.remove(contextDir);
+          }
+        } finally {
+          if (await fs.pathExists(tempTarPath)) {
+            await fs.remove(tempTarPath);
+          }
+        }
+      }
+      console.log('✅ Pull de agentes concluído!');
+    } catch (error: any) {
+      console.error('❌ Erro durante o pull dos agentes:', error.message);
+    }
+    
+    console.log('\n🚀 SYNC COMPLETO! Workspace atualizado.');
+  });
+
 program.parse();
