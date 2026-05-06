@@ -110,7 +110,7 @@ Before using the deployment commands, make sure to add your GoClaw Bearer Token 
   "goclaw": {
     "api_url": "http://localhost:18790",
     "token": "YOUR_BEARER_TOKEN",
-    "default_provider": "ollama cloud",
+    "default_provider": "ollama-cloud",
     "default_model": "deepseek-v4-pro",
     "skills_import_endpoint": "/v1/skills/import",
     "skills_export_endpoint": "/v1/skills/export"
