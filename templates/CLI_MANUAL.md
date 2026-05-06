@@ -1,0 +1,100 @@
+# AgentForge Workspace 🤖⚒️
+
+Welcome to your AgentForge Workspace! This repository is managed by the `agentforge` CLI, which allows you to scaffold, manage, build, and deploy AI Agents and Skills for the GoClaw platform.
+
+## Getting Started
+
+To start a new project for your agents, create an empty folder, navigate into it, and initialize the workspace:
+
+```bash
+mkdir my-ai-agents
+cd my-ai-agents
+agentforge init
+```
+
+This will create the necessary directory structure and the configuration file (`agentforge.json`).
+
+---
+
+## Workspace Structure
+After running the `init` command, your workspace will look like this:
+
+```text
+my-ai-agents/
+├── agentforge.json      # Your workspace configuration and GoClaw API credentials
+├── agents/              # Where your local agents will live
+├── documents/           # Reference documentation for your AI assistants
+├── exports/             # Where built files are stored for deployment
+├── skills/              # Where your local skills will live
+├── teams/               # Where your AI teams will live
+└── templates/           # Customizable templates for your Agents and Skills
+```
+
+---
+
+## Commands Reference
+
+### Init
+```bash
+agentforge init
+```
+Initializes the current directory as an AgentForge workspace. It creates the base folders, copies default templates, and generates an `agentforge.json` config file.
+
+### Agents
+```bash
+agentforge new agent "<Agent Name>"
+```
+Creates a new agent inside the `agents/` directory using the files found in `templates/default-agent/`. If the name contains spaces, remember to wrap it in quotes. The CLI will automatically slugify the folder name (e.g., `agents/my-super-agent/`).
+
+### Skills
+```bash
+agentforge new skill "<Skill Name>"
+```
+Creates a new skill inside the `skills/` directory using the template from `templates/default-skill/SKILL.md`.
+
+```bash
+agentforge build skill <slug>
+```
+Packages the skill folder into a `.zip` file ready for GoClaw deployment. The resulting archive is saved in the `exports/` folder.
+
+### API & Deployment
+Before using the deployment commands, make sure to add your GoClaw Bearer Token to the `agentforge.json` file located at the root of your workspace:
+
+```json
+{
+  "goclaw": {
+    "api_url": "http://localhost:18790",
+    "token": "YOUR_BEARER_TOKEN",
+    "default_provider": "ollama cloud",
+    "default_model": "deepseek-v4-pro"
+  }
+}
+```
+
+#### Deploying Skills
+```bash
+agentforge deploy skill <slug>
+```
+Automatically builds your skill into a `.zip` file and securely uploads it to your GoClaw server via the Upload API.
+
+#### Deploying Agents
+```bash
+agentforge deploy context <slug>
+```
+**Hot Reload for Context:** Fast-path deployment that reads all local `.md`, `.txt`, and `.py` files in your agent folder and uploads them directly to the agent's mind on the server. Perfect for iterating on prompts.
+
+```bash
+agentforge deploy agent <slug>
+```
+**Full Deployment:** Reads the local `agent.json` to create a new agent or update an existing one (e.g., updating the LLM model). Then, it automatically synchronizes all context files.
+
+#### Sincronization (Pull)
+```bash
+agentforge pull skills
+```
+Downloads the latest backup archive of all skills and extracts them locally. Note: This will overwrite local files.
+
+```bash
+agentforge pull agents
+```
+Downloads all agents from the GoClaw server. It performs a **surgical extraction**, ignoring logs, user sessions, and memory, retrieving only the core `agent.json` and `context_files/` to keep your workspace perfectly clean. Note: This will overwrite local files.

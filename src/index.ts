@@ -82,10 +82,17 @@ program
 
     await fs.writeJson(path.join(basePath, "agentforge.json"), config, { spaces: 2 });
 
-    await fs.writeFile(
-      path.join(basePath, "README.md"),
-      `# Agent Workspace\n\nWorkspace criado pela AgentForge CLI.\n`
-    );
+    // Copiar o manual da CLI para servir de README do workspace
+    const cliManualPath = path.join(__dirname, "../templates/CLI_MANUAL.md");
+    const workspaceReadmePath = path.join(basePath, "README.md");
+    if (await fs.pathExists(cliManualPath)) {
+      await fs.copy(cliManualPath, workspaceReadmePath);
+    } else {
+      await fs.writeFile(
+        workspaceReadmePath,
+        `# Agent Workspace\n\nWorkspace criado pela AgentForge CLI.\n`
+      );
+    }
 
     // Opcional: Copiar os templates originais da CLI para o workspace do usuário
     const cliTemplatePath = path.join(__dirname, "../templates/default-agent");
@@ -108,6 +115,20 @@ program
 const newCmd = program
   .command("new")
   .description("Cria novas entidades (agentes, skills, etc)");
+
+program
+  .command("manual")
+  .alias("help-docs")
+  .description("Exibe o manual completo de uso da AgentForge CLI")
+  .action(async () => {
+    const cliManualPath = path.join(__dirname, "../templates/CLI_MANUAL.md");
+    if (await fs.pathExists(cliManualPath)) {
+      const content = await fs.readFile(cliManualPath, "utf-8");
+      console.log(content);
+    } else {
+      console.error("❌ Manual não encontrado.");
+    }
+  });
 
 newCmd
   .command("agent <name>")
