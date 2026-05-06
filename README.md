@@ -8,6 +8,14 @@ A powerful command-line interface to scaffold, manage, build, and deploy AI Agen
 
 ## Installation & Local Development
 
+### Global Installation (Recommended)
+You can install the AgentForge CLI globally directly from NPM:
+
+```bash
+npm install -g @innominatum/agentforge-cli
+```
+
+### Local Development
 Since you are modifying or maintaining the CLI source code, you should install and use it globally on your local machine using NPM's symlink feature:
 
 1. Clone this repository and navigate to its folder.
@@ -63,10 +71,17 @@ If you add a new command or change how the CLI works:
 
 ## NPM Publishing (Maintainers)
 
-When this CLI is ready for public release, ensure the following steps are taken:
-1. Update the `version` in `package.json` (e.g., `"version": "1.0.1"`).
-2. Ensure the `name` is correctly set to `"agentforge-cli"`.
-3. Verify that the `"bin"` property is pointing to `"./dist/index.js"`.
-4. Run `npm run build` to ensure the `dist/` directory is fully updated.
-5. Login to your npm account using `npm login`.
-6. Publish the package using `npm publish`.
+### Manual Publishing
+When this CLI is ready for a new release:
+1. Update the `version` in `package.json` (e.g., from `"1.0.1"` to `"1.0.2"`).
+2. Run `npm run build` to ensure the `dist/` directory is fully updated.
+3. Login to your npm account using `npm login`.
+4. Publish the package using `npm publish --access public` (you will be prompted for your 2FA security key).
+
+### Automated Publishing (GitHub Actions CI/CD)
+To automate publishing so you don't need a hardware security key every time:
+1. Go to NPM website > Profile > **Access Tokens**.
+2. Create a new **Automation Token** (this type of token specifically bypasses 2FA/OTP for CI/CD environments).
+3. Go to this repository on GitHub > Settings > Secrets and variables > Actions.
+4. Add a new repository secret called `NPM_TOKEN` and paste your automation token.
+5. You can then create a `.github/workflows/publish.yml` file to run `npm publish` automatically whenever you push a new tag or merge to main!
