@@ -164,6 +164,10 @@ newCmd
           agent_key: slug,
           display_name: name,
           agent_type: "custom",
+          status: "active",
+          emoji: "🔥",
+          context_window: 200000,
+          max_tool_iterations: 30,
           provider: config.goclaw?.default_provider || "ollama cloud",
           model: config.goclaw?.default_model || "deepseek-v4-pro",
           frontmatter: `Expertise summary for ${name}`
