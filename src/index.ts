@@ -8,6 +8,22 @@ import AdmZip from "adm-zip";
 import FormData from "form-data";
 import tar from "tar";
 import axios from "axios";
+
+function getWorkspaceRoot(): string {
+  let dir = process.cwd();
+  while (dir !== path.parse(dir).root) {
+    if (fs.existsSync(path.join(dir, "agentforge.json")) || fs.existsSync(path.join(dir, "agentforge.yml"))) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  if (fs.existsSync(path.join(dir, "agentforge.json")) || fs.existsSync(path.join(dir, "agentforge.yml"))) {
+    return dir;
+  }
+  console.error("❌ Erro: Não foi possível encontrar a raiz do workspace (agentforge.json). Certifique-se de estar dentro do projeto.");
+  process.exit(1);
+}
+
 const program = new Command();
 
 program
@@ -72,7 +88,7 @@ newCmd
   .command("agent <name>")
   .description("Cria um novo agente com os ficheiros base da template")
   .action(async (name: string) => {
-    const basePath = process.cwd();
+    const basePath = getWorkspaceRoot();
     const slug = slugify(name, { lower: true, strict: true });
 
     const agentPath = path.join(basePath, "agents", slug);
@@ -111,7 +127,7 @@ newCmd
   .command("skill <name>")
   .description("Cria uma nova skill usando o template base")
   .action(async (name: string) => {
-    const basePath = process.cwd();
+    const basePath = getWorkspaceRoot();
     const slug = slugify(name, { lower: true, strict: true });
 
     const skillPath = path.join(basePath, "skills", slug);
@@ -163,7 +179,7 @@ buildCmd
   .command("skill <slug>")
   .description("Empacota uma skill em um arquivo .zip na pasta exports/")
   .action(async (slug: string) => {
-    const basePath = process.cwd();
+    const basePath = getWorkspaceRoot();
     const skillPath = path.join(basePath, "skills", slug);
     const exportsPath = path.join(basePath, "exports");
     const zipPath = path.join(exportsPath, `${slug}.zip`);
@@ -183,7 +199,8 @@ buildCmd
   });
 
 async function getConfig() {
-  const configPath = path.join(process.cwd(), "agentforge.json");
+  const root = getWorkspaceRoot();
+  const configPath = path.join(root, "agentforge.json");
   if (!(await fs.pathExists(configPath))) {
     console.error("❌ Arquivo agentforge.json não encontrado. Execute 'agentforge init' primeiro.");
     process.exit(1);
@@ -205,7 +222,7 @@ deployCmd
       process.exit(1);
     }
 
-    const basePath = process.cwd();
+    const basePath = getWorkspaceRoot();
     const skillPath = path.join(basePath, "skills", slug);
     const exportsPath = path.join(basePath, "exports");
     const zipPath = path.join(exportsPath, `${slug}.zip`);
@@ -267,7 +284,7 @@ program
         responseType: "stream"
       });
 
-      const tempTarPath = path.join(process.cwd(), "temp_skills.tar.gz");
+      const tempTarPath = path.join(getWorkspaceRoot(), "temp_skills.tar.gz");
       const writer = fs.createWriteStream(tempTarPath);
       response.data.pipe(writer);
 
@@ -279,7 +296,7 @@ program
       console.log("📦 Extraindo skills para a pasta local...");
       await tar.x({
         file: tempTarPath,
-        cwd: process.cwd() 
+        cwd: getWorkspaceRoot() 
       });
 
       await fs.remove(tempTarPath);
