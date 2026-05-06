@@ -1,6 +1,6 @@
 {
   "name": "@innominatum/agentforge-cli",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A powerful command-line interface to scaffold, manage, build, and deploy AI Agents and Skills for the GoClaw platform.",
   "main": "dist/index.js",
   "bin": {
@@ -15,6 +15,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Innominatum-pt/agentforge-cli.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "ai",
