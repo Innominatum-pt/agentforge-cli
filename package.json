@@ -26,14 +26,18 @@
   "homepage": "https://github.com/Innominatum-pt/agents-cli#readme",
   "dependencies": {
     "adm-zip": "^0.5.17",
+    "axios": "^1.16.0",
     "commander": "^14.0.3",
+    "form-data": "^4.0.5",
     "fs-extra": "^11.3.4",
-    "slugify": "^1.6.9"
+    "slugify": "^1.6.9",
+    "tar": "^7.5.14"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.6.0",
+    "@types/tar": "^6.1.13",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }

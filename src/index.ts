@@ -5,7 +5,9 @@ import fs from "fs-extra";
 import path from "path";
 import slugify from "slugify";
 import AdmZip from "adm-zip";
-
+import FormData from "form-data";
+import tar from "tar";
+import axios from "axios";
 const program = new Command();
 
 program
@@ -32,10 +34,19 @@ program
       await fs.ensureDir(path.join(basePath, folder));
     }
 
-    await fs.writeFile(
-      path.join(basePath, "agentforge.yml"),
-      `workspace: agentforge\nversion: 1\ndefault_vendor: goclaw\n`
-    );
+    const config = {
+      workspace: "agentforge",
+      version: 1,
+      goclaw: {
+        api_url: "http://localhost:8080",
+        username: "system",
+        token: "",
+        skills_import_endpoint: "/v1/skills/import",
+        skills_export_endpoint: "/v1/skills/export"
+      }
+    };
+
+    await fs.writeJson(path.join(basePath, "agentforge.json"), config, { spaces: 2 });
 
     await fs.writeFile(
       path.join(basePath, "README.md"),
@@ -169,6 +180,118 @@ buildCmd
     zip.writeZip(zipPath);
 
     console.log(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
+  });
+
+async function getConfig() {
+  const configPath = path.join(process.cwd(), "agentforge.json");
+  if (!(await fs.pathExists(configPath))) {
+    console.error("❌ Arquivo agentforge.json não encontrado. Execute 'agentforge init' primeiro.");
+    process.exit(1);
+  }
+  return await fs.readJson(configPath);
+}
+
+const deployCmd = program
+  .command("deploy")
+  .description("Faz o deploy de entidades para a plataforma GoClaw");
+
+deployCmd
+  .command("skill <slug>")
+  .description("Faz o build da skill e envia para a API do GoClaw")
+  .action(async (slug: string) => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
+      process.exit(1);
+    }
+
+    const basePath = process.cwd();
+    const skillPath = path.join(basePath, "skills", slug);
+    const exportsPath = path.join(basePath, "exports");
+    const zipPath = path.join(exportsPath, `${slug}.zip`);
+
+    if (!(await fs.pathExists(skillPath))) {
+      console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
+      process.exit(1);
+    }
+    
+    await fs.ensureDir(exportsPath);
+    const zip = new AdmZip();
+    zip.addLocalFolder(skillPath);
+    zip.writeZip(zipPath);
+    console.log(`✅ Build concluído: ${slug}.zip preparado para envio.`);
+
+    console.log(`🚀 Fazendo upload para o GoClaw...`);
+    const form = new FormData();
+    form.append("file", fs.createReadStream(zipPath));
+
+    try {
+      const url = `${config.goclaw.api_url}${config.goclaw.skills_import_endpoint || '/v1/skills/import'}`;
+      const response = await axios.post(url, form, {
+        headers: {
+          ...form.getHeaders(),
+          Authorization: `Bearer ${config.goclaw.token}`
+        }
+      });
+      console.log("✅ Deploy realizado com sucesso!");
+      console.log(response.data);
+    } catch (error: any) {
+      console.error("❌ Erro durante o deploy:");
+      if (error.response) {
+        console.error(error.response.data);
+      } else {
+        console.error(error.message);
+      }
+    }
+  });
+
+program
+  .command("pull")
+  .description("Sincroniza entidades do GoClaw para o workspace local")
+  .command("skills")
+  .description("Faz download do arquivo tar.gz de skills do GoClaw e extrai localmente")
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
+      process.exit(1);
+    }
+
+    console.log("📥 Baixando skills do GoClaw...");
+    try {
+      const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${config.goclaw.token}`
+        },
+        responseType: "stream"
+      });
+
+      const tempTarPath = path.join(process.cwd(), "temp_skills.tar.gz");
+      const writer = fs.createWriteStream(tempTarPath);
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on("finish", resolve);
+        writer.on("error", reject);
+      });
+
+      console.log("📦 Extraindo skills para a pasta local...");
+      await tar.x({
+        file: tempTarPath,
+        cwd: process.cwd() 
+      });
+
+      await fs.remove(tempTarPath);
+      console.log("✅ Pull concluído com sucesso! As skills foram atualizadas localmente.");
+    } catch (error: any) {
+      console.error("❌ Erro durante o pull das skills:");
+      if (error.response) {
+        console.error(`Status HTTP ${error.response.status}`);
+      } else {
+        console.error(error.message);
+      }
+    }
   });
 
 program.parse();
