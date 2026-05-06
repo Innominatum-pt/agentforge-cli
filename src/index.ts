@@ -6,7 +6,7 @@ import path from "path";
 import slugify from "slugify";
 import AdmZip from "adm-zip";
 import FormData from "form-data";
-import tar from "tar";
+import * as tar from "tar";
 import axios from "axios";
 
 function getWorkspaceRoot(): string {
@@ -500,36 +500,41 @@ pullCmd
         });
 
         const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
-        const writer = fs.createWriteStream(tempTarPath);
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-          writer.on("finish", resolve);
-          writer.on("error", reject);
-        });
-
-        const agentPath = path.join(getWorkspaceRoot(), "agents", slug);
-        await fs.ensureDir(agentPath);
-
-        await tar.x({
-          file: tempTarPath,
-          cwd: agentPath,
-          strip: 0, 
-          filter: (path) => {
-            return path === 'agent.json' || path.startsWith('context_files/');
-          }
-        });
         
-        const contextDir = path.join(agentPath, "context_files");
-        if (await fs.pathExists(contextDir)) {
-          const contextFiles = await fs.readdir(contextDir);
-          for (const f of contextFiles) {
-            await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
-          }
-          await fs.remove(contextDir);
-        }
+        try {
+          const writer = fs.createWriteStream(tempTarPath);
+          response.data.pipe(writer);
 
-        await fs.remove(tempTarPath);
+          await new Promise((resolve, reject) => {
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+          });
+
+          const agentPath = path.join(getWorkspaceRoot(), "agents", slug);
+          await fs.ensureDir(agentPath);
+
+          await tar.x({
+            file: tempTarPath,
+            cwd: agentPath,
+            strip: 0, 
+            filter: (path) => {
+              return path === 'agent.json' || path.startsWith('context_files/');
+            }
+          });
+          
+          const contextDir = path.join(agentPath, "context_files");
+          if (await fs.pathExists(contextDir)) {
+            const contextFiles = await fs.readdir(contextDir);
+            for (const f of contextFiles) {
+              await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+            }
+            await fs.remove(contextDir);
+          }
+        } finally {
+          if (await fs.pathExists(tempTarPath)) {
+            await fs.remove(tempTarPath);
+          }
+        }
       }
       console.log("✅ Pull de agentes concluído com sucesso!");
     } catch (error: any) {
