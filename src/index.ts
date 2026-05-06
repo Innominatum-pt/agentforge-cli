@@ -306,9 +306,59 @@ deployCmd
     }
   });
 
+async function deployContextFiles(slug: string, config: any) {
+  const basePath = getWorkspaceRoot();
+  const agentPath = path.join(basePath, "agents", slug);
+  if (!(await fs.pathExists(agentPath))) {
+    throw new Error(`Agente não encontrado em agents/${slug}`);
+  }
+
+  const files = await fs.readdir(agentPath);
+  const contextFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.py')).filter(f => f !== 'README.md' && f !== 'agent.json');
+
+  if (contextFiles.length === 0) {
+    console.log(`Nenhum arquivo de contexto encontrado para "${slug}".`);
+    return;
+  }
+
+  const tempExportDir = path.join(basePath, `temp_export_${slug}`);
+  const tempContextDir = path.join(tempExportDir, "context_files");
+  const tarPath = path.join(basePath, `temp_export_${slug}.tar.gz`);
+
+  try {
+    await fs.ensureDir(tempContextDir);
+    for (const file of contextFiles) {
+      await fs.copy(path.join(agentPath, file), path.join(tempContextDir, file));
+    }
+
+    await tar.c({
+      gzip: true,
+      file: tarPath,
+      cwd: tempExportDir
+    }, ["context_files"]);
+
+    const form = new FormData();
+    form.append("file", fs.createReadStream(tarPath));
+
+    const url = `${config.goclaw.api_url}/v1/agents/${slug}/import?include=context_files`;
+    await axios.post(url, form, {
+      headers: {
+        ...form.getHeaders(),
+        Authorization: `Bearer ${config.goclaw.token}`,
+        "X-GoClaw-User-Id": config.goclaw.username || "system"
+      }
+    });
+
+    console.log(`✅ Upload cirúrgico de ${contextFiles.length} arquivos concluído com sucesso!`);
+  } finally {
+    if (await fs.pathExists(tempExportDir)) await fs.remove(tempExportDir);
+    if (await fs.pathExists(tarPath)) await fs.remove(tarPath);
+  }
+}
+
 deployCmd
   .command("context <slug>")
-  .description("Faz upload dos arquivos de contexto (.md, .txt) diretamente para o agente")
+  .description("Faz upload dos arquivos de contexto diretamente para o agente usando a API de importação")
   .action(async (slug: string) => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
@@ -316,38 +366,13 @@ deployCmd
       process.exit(1);
     }
     
-    const basePath = getWorkspaceRoot();
-    const agentPath = path.join(basePath, "agents", slug);
-    if (!(await fs.pathExists(agentPath))) {
-      console.error(`❌ Agente não encontrado em agents/${slug}`);
-      process.exit(1);
-    }
-
     console.log(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
-    
-    const files = await fs.readdir(agentPath);
-    for (const file of files) {
-      if (file === "agent.json" || file === "README.md") continue;
-      
-      const filePath = path.join(agentPath, file);
-      const stat = await fs.stat(filePath);
-      if (stat.isFile()) {
-        const content = await fs.readFile(filePath, "utf-8");
-        const url = `${config.goclaw.api_url}/v1/agents/${slug}/files/${file}`;
-        try {
-          await axios.put(url, content, {
-            headers: {
-              "Content-Type": "text/plain",
-              Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
-            }
-          });
-          console.log(`✅ Upload: ${file}`);
-        } catch (error: any) {
-          console.error(`❌ Erro ao enviar ${file}:`, error.response?.data || error.message);
-        }
-      }
+    try {
+      await deployContextFiles(slug, config);
+      console.log("✅ Deploy de contexto concluído!");
+    } catch (error: any) {
+      console.error("❌ Erro ao enviar contexto:", error.response?.data || error.message);
     }
-    console.log("✅ Deploy de contexto concluído!");
   });
 
 deployCmd
@@ -397,30 +422,14 @@ deployCmd
          });
          console.log("✅ Configurações do agente atualizadas.");
       }
+
+      console.log(`🚀 Sincronizando arquivos de contexto...`);
+      await deployContextFiles(slug, config);
+
+      console.log("✅ Deploy completo concluído!");
     } catch (error: any) {
       console.error(`❌ Erro no deploy da configuração:`, error.response?.data || error.message);
-      return;
     }
-
-    const files = await fs.readdir(agentPath);
-    for (const file of files) {
-      if (file === "agent.json" || file === "README.md") continue;
-      const filePath = path.join(agentPath, file);
-      const stat = await fs.stat(filePath);
-      if (stat.isFile()) {
-        const content = await fs.readFile(filePath, "utf-8");
-        const url = `${config.goclaw.api_url}/v1/agents/${slug}/files/${file}`;
-        try {
-          await axios.put(url, content, {
-            headers: { "Content-Type": "text/plain", Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-          });
-          console.log(`✅ Upload: ${file}`);
-        } catch (error: any) {
-          console.error(`❌ Erro ao enviar ${file}:`, error.response?.data || error.message);
-        }
-      }
-    }
-    console.log("✅ Deploy completo concluído!");
   });
 
 const pullCmd = program
