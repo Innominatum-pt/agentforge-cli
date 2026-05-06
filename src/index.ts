@@ -57,7 +57,7 @@ program
     const folders = [
       "agents",
       "teams",
-      "vendors/goclaw",
+      "documents",
       "templates/default-agent",
       "exports"
     ];
@@ -93,6 +93,13 @@ program
     
     if (await fs.pathExists(cliTemplatePath)) {
       await fs.copy(cliTemplatePath, workspaceTemplatePath);
+    }
+
+    // Copiar documentação do GoClaw para a pasta documents
+    const cliDocPath = path.join(__dirname, "../goclaw-llms-full.txt");
+    const workspaceDocPath = path.join(basePath, "documents/goclaw-llms-full.txt");
+    if (await fs.pathExists(cliDocPath)) {
+      await fs.copy(cliDocPath, workspaceDocPath);
     }
 
     console.log("Workspace de agentes criado com sucesso.");
