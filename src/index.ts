@@ -234,8 +234,8 @@ buildCmd
     await tar.c({
       gzip: true,
       file: tarPath,
-      cwd: path.join(basePath, "skills")
-    }, [slug]);
+      cwd: basePath
+    }, [`skills/${slug}`]);
 
     console.log(`✅ Build concluído: ${slug}.tar.gz salvo na pasta exports/`);
   });
@@ -282,8 +282,8 @@ deployCmd
     await tar.c({
       gzip: true,
       file: tarPath,
-      cwd: path.join(basePath, "skills")
-    }, [slug]);
+      cwd: basePath
+    }, [`skills/${slug}`]);
     
     console.log(`✅ Build concluído: ${slug}.tar.gz preparado para envio.`);
 
