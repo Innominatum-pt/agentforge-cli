@@ -78,10 +78,16 @@ When this CLI is ready for a new release:
 3. Login to your npm account using `npm login`.
 4. Publish the package using `npm publish --access public` (you will be prompted for your 2FA security key).
 
-### Automated Publishing (GitHub Actions CI/CD)
-To automate publishing so you don't need a hardware security key every time:
-1. Go to NPM website > Profile > **Access Tokens**.
-2. Create a new **Automation Token** (this type of token specifically bypasses 2FA/OTP for CI/CD environments).
-3. Go to this repository on GitHub > Settings > Secrets and variables > Actions.
-4. Add a new repository secret called `NPM_TOKEN` and paste your automation token.
-5. You can then create a `.github/workflows/publish.yml` file to run `npm publish` automatically whenever you push a new tag or merge to main!
+### Automated Publishing (Trusted Publishing / OIDC)
+To fully automate your CI/CD pipeline securely without using any hardcoded NPM tokens or bypassing 2FA, NPM provides "Trusted Publishing" with GitHub Actions:
+
+1. Go to the NPM website and navigate to the `@innominatum/agentforge-cli` package.
+2. Go to **Settings** > **Publishing Access**.
+3. Under **Trusted Publishers**, click **Add Publisher** > **GitHub Actions**.
+4. Fill in the repository details:
+   - **GitHub Organization/User:** `Innominatum-pt`
+   - **GitHub Repository:** `agentforge-cli`
+   - **Workflow file (optional):** `publish.yml`
+5. Click **Add Publisher**.
+
+Once configured, the `.github/workflows/publish.yml` workflow provided in this repository will automatically securely authenticate via OIDC and publish your package whenever you create a new GitHub Release.
