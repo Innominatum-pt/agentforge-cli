@@ -166,7 +166,8 @@ newCmd
           agent_type: "custom",
           provider: config.goclaw?.default_provider || "ollama cloud",
           model: config.goclaw?.default_model || "deepseek-v4-pro",
-          description: `Agent ${name} created by AgentForge`
+          frontmatter: `Expertise summary for ${name}`,
+          agent_description: `Agent ${name} created by AgentForge`
         };
         await fs.writeJson(path.join(agentPath, "agent.json"), agentJson, { spaces: 2 });
       } catch (err) {
