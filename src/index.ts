@@ -550,15 +550,10 @@ async function deployAllSkills(config: any, basePath: string) {
       const itemPath = path.join(skillsDir, item);
       if ((await fs.stat(itemPath)).isDirectory()) {
         if (item === "system") {
-          const systemSkills = await fs.readdir(itemPath);
-          for (const sysItem of systemSkills) {
-            if ((await fs.stat(path.join(itemPath, sysItem))).isDirectory()) {
-              await deploySkill(`system/${sysItem}`, config, basePath);
-            }
-          }
-        } else {
-          await deploySkill(item, config, basePath);
+          console.log("⏩ Ignorando pasta 'system/' (skills nativas do GoClaw são apenas de leitura)");
+          continue;
         }
+        await deploySkill(item, config, basePath);
       }
     }
   } else {
