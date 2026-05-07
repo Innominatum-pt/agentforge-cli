@@ -1,6 +1,6 @@
 {
   "name": "@innominatum/agentforge-cli",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A powerful command-line interface to scaffold, manage, build, and deploy AI Agents and Skills for the GoClaw platform.",
   "main": "dist/index.js",
   "bin": {
