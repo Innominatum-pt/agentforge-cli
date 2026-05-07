@@ -637,6 +637,28 @@ pullCmd
         }
       }
 
+      // Remover quaisquer skills fantasmas que o tarball tenha extraído (skills apagadas mas ainda no export)
+      const validSlugs = new Set(skills.map((s: any) => s.is_system === true ? path.join("system", s.slug) : s.slug));
+      const skillsDir = path.join(getWorkspaceRoot(), "skills");
+      if (await fs.pathExists(skillsDir)) {
+        const localItems = await fs.readdir(skillsDir);
+        for (const item of localItems) {
+          if (item === "system") {
+            const systemDir = path.join(skillsDir, "system");
+            if (await fs.pathExists(systemDir)) {
+              const systemItems = await fs.readdir(systemDir);
+              for (const sysItem of systemItems) {
+                if (!validSlugs.has(path.join("system", sysItem))) {
+                  await fs.remove(path.join(systemDir, sysItem));
+                }
+              }
+            }
+          } else if (!validSlugs.has(item)) {
+            await fs.remove(path.join(skillsDir, item));
+          }
+        }
+      }
+
       console.log("✅ Pull concluído com sucesso! As skills foram atualizadas localmente.");
     } catch (error: any) {
       console.error("❌ Erro durante o pull das skills:");
