@@ -314,9 +314,6 @@ const deployCmd = program
   .command("deploy")
   .description("Faz o deploy de entidades para a plataforma GoClaw");
 
-deployCmd
-  .command("skill <slug>")
-  .description("Faz o build da skill e envia para a API do GoClaw")
 async function deploySkill(slug: string, config: any, basePath: string) {
   const skillPath = path.join(basePath, "skills", slug);
   const exportsPath = path.join(basePath, "exports");
@@ -537,44 +534,90 @@ deployCmd
       process.exit(1);
     }
 
-    const basePath = getWorkspaceRoot();
-    
-    // Deploy Agents
-    const agentsDir = path.join(basePath, "agents");
-    if (await fs.pathExists(agentsDir)) {
-      const agents = await fs.readdir(agentsDir);
-      console.log(`🚀 Iniciando deploy em lote de ${agents.length} agentes...`);
-      for (const slug of agents) {
-        const agentPath = path.join(agentsDir, slug);
-        if ((await fs.stat(agentPath)).isDirectory()) {
-           await deployAgent(slug, config);
+async function deployAllAgents(config: any, basePath: string) {
+  const agentsDir = path.join(basePath, "agents");
+  if (await fs.pathExists(agentsDir)) {
+    const agents = await fs.readdir(agentsDir);
+    console.log(`🚀 Iniciando deploy em lote de ${agents.length} agentes...`);
+    for (const slug of agents) {
+      const agentPath = path.join(agentsDir, slug);
+      if ((await fs.stat(agentPath)).isDirectory()) {
+         await deployAgent(slug, config);
+      }
+    }
+  } else {
+    console.log("Nenhum agente encontrado em agents/.");
+  }
+}
+
+async function deployAllSkills(config: any, basePath: string) {
+  const skillsDir = path.join(basePath, "skills");
+  if (await fs.pathExists(skillsDir)) {
+    const skills = await fs.readdir(skillsDir);
+    console.log(`🚀 Iniciando deploy em lote de skills...`);
+    for (const item of skills) {
+      const itemPath = path.join(skillsDir, item);
+      if ((await fs.stat(itemPath)).isDirectory()) {
+        if (item === "system") {
+          const systemSkills = await fs.readdir(itemPath);
+          for (const sysItem of systemSkills) {
+            if ((await fs.stat(path.join(itemPath, sysItem))).isDirectory()) {
+              await deploySkill(`system/${sysItem}`, config, basePath);
+            }
+          }
+        } else {
+          await deploySkill(item, config, basePath);
         }
       }
+    }
+  } else {
+    console.log("Nenhuma skill encontrada em skills/.");
+  }
+}
+
+deployCmd
+  .command("agents")
+  .description("Faz deploy de todos os agentes do workspace")
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      process.exit(1);
+    }
+    const basePath = getWorkspaceRoot();
+    await deployAllAgents(config, basePath);
+    console.log("🏁 Deploy de agentes concluído!");
+  });
+
+deployCmd
+  .command("skills")
+  .description("Faz deploy de todas as skills do workspace")
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      process.exit(1);
+    }
+    const basePath = getWorkspaceRoot();
+    await deployAllSkills(config, basePath);
+    console.log("🏁 Deploy de skills concluído!");
+  });
+
+deployCmd
+  .command("all")
+  .description("Faz deploy de todos os agentes e skills do workspace")
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      process.exit(1);
     }
 
-    // Deploy Skills
-    const skillsDir = path.join(basePath, "skills");
-    if (await fs.pathExists(skillsDir)) {
-      const skills = await fs.readdir(skillsDir);
-      console.log(`🚀 Iniciando deploy em lote de skills...`);
-      for (const item of skills) {
-        const itemPath = path.join(skillsDir, item);
-        if ((await fs.stat(itemPath)).isDirectory()) {
-          if (item === "system") {
-            const systemSkills = await fs.readdir(itemPath);
-            for (const sysItem of systemSkills) {
-              if ((await fs.stat(path.join(itemPath, sysItem))).isDirectory()) {
-                await deploySkill(`system/${sysItem}`, config, basePath);
-              }
-            }
-          } else {
-            await deploySkill(item, config, basePath);
-          }
-        }
-      }
-    }
+    const basePath = getWorkspaceRoot();
+    await deployAllAgents(config, basePath);
+    await deployAllSkills(config, basePath);
     
-    console.log("🏁 Deploy em lote concluído!");
+    console.log("🏁 Deploy completo (agentes e skills) concluído!");
   });
 
 const pullCmd = program
