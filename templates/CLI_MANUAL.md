@@ -41,26 +41,32 @@ agentforge pull all
 ```
 Downloads all agents and skills from the GoClaw server. It performs a **surgical extraction**, retrieving only the core `agent.json`, `context_files/`, and skill definitions to keep your workspace perfectly clean. Note: This will ask for confirmation before overwriting local files.
 
+### Bulk Deployment
+```bash
+agentforge deploy all
+```
+Performs a full deployment (config + context + memory) for **all agents** found in your `agents/` directory. This is the most efficient way to synchronize your entire team after making cross-cutting changes.
+
 ### Agent Management
 ```bash
 agentforge new agent "<Agent Name>"
 ```
-Creates a new agent inside the `agents/` directory using the files found in `templates/default-agent/`. If the name contains spaces, remember to wrap it in quotes. The CLI will automatically slugify the folder name (e.g., `agents/my-super-agent/`).
+Creates a new agent inside the `agents/` directory. The default `agent_type` is now `predefined`, aligning with GoClaw's official standard for agents with established personalities.
 
 ```bash
 agentforge pull agents
 ```
-Downloads all agents from the GoClaw server and extracts them locally.
+Downloads all agents from the GoClaw server and extracts them locally. It automatically reconstructs memory files from GoClaw's internal JSONL format back into readable Markdown files.
 
 ```bash
 agentforge deploy agent <slug>
 ```
-**Full Deployment:** Reads the local `agent.json` to create a new agent or update an existing one (e.g., updating the LLM model). Then, it automatically synchronizes all context files.
+**Full Deployment:** Reads the local `agent.json` to create or update an agent. Then, it synchronizes all context files and memory (including `MEMORY.md` and the `memory/` folder).
 
 ```bash
 agentforge deploy context <slug>
 ```
-**Hot Reload for Context:** Fast-path deployment that reads all local `.md`, `.txt`, and `.py` files in your agent folder and uploads them directly to the agent's mind on the server. Perfect for iterating on prompts.
+**Hot Reload for Context & Memory:** Fast-path deployment that uploads all local context files (`.md`, `.txt`, `.py`) and memory data directly to the server.
 
 ### Skill Management
 ```bash
@@ -83,8 +89,18 @@ agentforge deploy skill <slug>
 ```
 Automatically builds your skill into a `.zip` file and securely uploads it to your GoClaw server via the Upload API.
 
-### Configuration
-Before using the deployment commands, make sure to add your GoClaw Bearer Token to the `agentforge.json` file located at the root of your workspace:
+---
+
+## Memory Support 🧠
+AgentForge CLI handles agent memory as first-class citizens:
+- **MEMORY.md**: Use this file at the root of your agent folder for curated, long-term memory.
+- **memory/**: Any files inside this folder (e.g., chat histories, user-specific facts) are synchronized.
+- **Auto-Conversion**: When pulling, the CLI converts GoClaw's `.jsonl` exports back into `.md` files for easier editing in VS Code.
+
+---
+
+## Configuration
+Before using the deployment commands, make sure to add your GoClaw Bearer Token to the `agentforge.json` file:
 
 ```json
 {
