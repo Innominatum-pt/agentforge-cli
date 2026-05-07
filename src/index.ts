@@ -344,10 +344,63 @@ async function deploySkill(slug: string, config: any, basePath: string) {
     });
     const data = response.data;
     if (data && data.version) {
-      console.log(`✅ Skill "${slug}" atualizada para a versão ${data.version}.`);
+      console.log(`✅ Arquivos da skill "${slug}" atualizados (versão ${data.version}).`);
     } else {
-      console.log(`✅ Skill "${slug}" atualizada.`);
+      console.log(`✅ Arquivos da skill "${slug}" atualizados.`);
     }
+
+    // Sincronizar metadados (visibility, description, tags, etc)
+    const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
+      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+    });
+    const remoteSkill = skillsListRes.data.skills?.find((s: any) => s.slug === slug);
+    
+    if (remoteSkill) {
+      const metadataPath = path.join(skillPath, "metadata.json");
+      if (await fs.pathExists(metadataPath)) {
+        console.log(`🚀 Sincronizando metadados da skill "${slug}"...`);
+        const metadata = await fs.readJson(metadataPath);
+        
+        // Remover campos que não devem ser enviados no PUT
+        const payload = { ...metadata };
+        delete payload.id;
+        delete payload.slug;
+        delete payload.name;
+        
+        await axios.put(`${config.goclaw.api_url}/v1/skills/${remoteSkill.id}`, payload, {
+          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+        });
+        console.log(`✅ Metadados sincronizados com sucesso.`);
+      }
+
+      // Sincronizar permissões (grants)
+      const grantsPath = path.join(skillPath, "grants.jsonl");
+      if (await fs.pathExists(grantsPath)) {
+        console.log(`🚀 Sincronizando permissões (grants) da skill "${slug}"...`);
+        const grantsContent = await fs.readFile(grantsPath, 'utf8');
+        const lines = grantsContent.split('\n').filter(l => l.trim());
+        
+        for (const line of lines) {
+          try {
+            const grant = JSON.parse(line);
+            if (grant.agent_key) {
+              const agentId = await resolveAgentId(grant.agent_key, config);
+              if (agentId) {
+                await axios.post(`${config.goclaw.api_url}/v1/skills/${remoteSkill.id}/grants/agent`, 
+                  { agent_id: agentId, version: grant.pinned_version || null },
+                  { headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" } }
+                );
+                console.log(`   ➕ Permissão concedida ao agente: ${grant.agent_key}`);
+              }
+            }
+          } catch (e: any) {
+            console.warn(`   ⚠️ Falha ao conceder permissão: ${e.response?.data?.error || e.message}`);
+          }
+        }
+        console.log(`✅ Permissões sincronizadas.`);
+      }
+    }
+
   } catch (error: any) {
     console.error(`❌ Erro no deploy da skill "${slug}":`);
     if (error.response) {
