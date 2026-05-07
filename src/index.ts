@@ -17,7 +17,7 @@ function confirmOverwrite(entityType: string): Promise<boolean> {
   });
 
   return new Promise(resolve => {
-    rl.question(`⚠️ Atenção: O pull irá sobrescrever as suas ${entityType} locais. Quaisquer alterações não publicadas serão perdidas. Deseja continuar? (s/N) `, answer => {
+    rl.question(`⚠️ Atenção: O pull irá APAGAR as suas ${entityType} locais e substituí-las pelo estado do servidor. Quaisquer alterações ou entidades não publicadas serão PERDIDAS. Deseja continuar? (s/N) `, answer => {
       rl.close();
       const isYes = answer.toLowerCase() === 's' || answer.toLowerCase() === 'sim' || answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
       resolve(isYes);
@@ -569,6 +569,9 @@ pullCmd
       return;
     }
 
+    console.log("🧹 Limpando a pasta local de skills...");
+    await fs.emptyDir(path.join(getWorkspaceRoot(), "skills"));
+
     console.log("📥 Baixando skills do GoClaw...");
     try {
       const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
@@ -659,6 +662,9 @@ pullCmd
       console.log("❌ Pull cancelado pelo utilizador.");
       return;
     }
+
+    console.log("🧹 Limpando a pasta local de agentes...");
+    await fs.emptyDir(path.join(getWorkspaceRoot(), "agents"));
 
     console.log("📥 Buscando lista de agentes do GoClaw...");
     try {
