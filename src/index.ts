@@ -451,6 +451,42 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
   }
 }
 
+async function deployAgent(slug: string, config: any) {
+  const basePath = getWorkspaceRoot();
+  const agentPath = path.join(basePath, "agents", slug);
+  const agentJsonPath = path.join(agentPath, "agent.json");
+
+  if (!(await fs.pathExists(agentJsonPath))) {
+    console.error(`❌ agent.json não encontrado em agents/${slug}.`);
+    return;
+  }
+
+  const agentConfig = await fs.readJson(agentJsonPath);
+  console.log(`🚀 Sincronizando agente "${slug}"...`);
+  
+  try {
+    const agentId = await resolveAgentId(slug, config);
+    const exists = agentId !== null;
+
+    if (!exists) {
+       await axios.post(`${config.goclaw.api_url}/v1/agents`, agentConfig, {
+         headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+       });
+       console.log(`✅ Agente "${slug}" criado.`);
+    } else {
+       await axios.put(`${config.goclaw.api_url}/v1/agents/${agentId}`, agentConfig, {
+         headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+       });
+       console.log(`✅ Configuração de "${slug}" atualizada.`);
+    }
+
+    await deployContextFiles(slug, config, agentId);
+    console.log(`✅ Agente "${slug}" sincronizado com sucesso!`);
+  } catch (error: any) {
+    console.error(`❌ Erro no deploy de "${slug}":`, error.response?.data || error.message);
+  }
+}
+
 deployCmd
   .command("context <slug>")
   .description("Faz upload dos arquivos de contexto diretamente para o agente usando a API de importação")
@@ -480,41 +516,38 @@ deployCmd
       process.exit(1);
     }
 
-    const basePath = getWorkspaceRoot();
-    const agentPath = path.join(basePath, "agents", slug);
-    const agentJsonPath = path.join(agentPath, "agent.json");
+    await deployAgent(slug, config);
+  });
 
-    if (!(await fs.pathExists(agentJsonPath))) {
-      console.error(`❌ agent.json não encontrado em agents/${slug}.`);
+deployCmd
+  .command("all")
+  .description("Faz deploy de todos os agentes do workspace")
+  .action(async () => {
+    const config = await getConfig();
+    if (!config.goclaw || !config.goclaw.token) {
+      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
       process.exit(1);
     }
 
-    const agentConfig = await fs.readJson(agentJsonPath);
-    console.log(`🚀 Atualizando configuração do agente "${slug}"...`);
+    const basePath = getWorkspaceRoot();
+    const agentsDir = path.join(basePath, "agents");
     
-    try {
-      const agentId = await resolveAgentId(slug, config);
-      const exists = agentId !== null;
-
-      if (!exists) {
-         await axios.post(`${config.goclaw.api_url}/v1/agents`, agentConfig, {
-           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-         });
-         console.log("✅ Agente criado com sucesso.");
-      } else {
-         await axios.put(`${config.goclaw.api_url}/v1/agents/${agentId}`, agentConfig, {
-           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-         });
-         console.log("✅ Configurações do agente atualizadas.");
-      }
-
-      console.log(`🚀 Sincronizando arquivos de contexto...`);
-      await deployContextFiles(slug, config, agentId);
-
-      console.log("✅ Deploy completo concluído!");
-    } catch (error: any) {
-      console.error(`❌ Erro no deploy da configuração:`, error.response?.data || error.message);
+    if (!(await fs.pathExists(agentsDir))) {
+      console.log("Nenhum agente encontrado em agents/.");
+      return;
     }
+
+    const agents = await fs.readdir(agentsDir);
+    console.log(`🚀 Iniciando deploy em lote de ${agents.length} agentes...`);
+    
+    for (const slug of agents) {
+      const agentPath = path.join(agentsDir, slug);
+      if ((await fs.stat(agentPath)).isDirectory()) {
+         await deployAgent(slug, config);
+      }
+    }
+    
+    console.log("🏁 Deploy em lote concluído!");
   });
 
 const pullCmd = program
