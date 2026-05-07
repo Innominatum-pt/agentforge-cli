@@ -524,15 +524,6 @@ deployCmd
     await deployAgent(slug, config);
   });
 
-deployCmd
-  .command("all")
-  .description("Faz deploy de todos os agentes do workspace")
-  .action(async () => {
-    const config = await getConfig();
-    if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
-      process.exit(1);
-    }
 
 async function deployAllAgents(config: any, basePath: string) {
   const agentsDir = path.join(basePath, "agents");
