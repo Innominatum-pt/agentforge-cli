@@ -297,6 +297,19 @@ async function getConfig() {
   return config;
 }
 
+async function resolveAgentId(slug: string, config: any): Promise<string | null> {
+  try {
+    const listResponse = await axios.get(`${config.goclaw.api_url}/v1/agents`, {
+      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+    });
+    const agents = listResponse.data.agents || [];
+    const agent = agents.find((a: any) => a.agent_key === slug);
+    return agent ? agent.id : null;
+  } catch (error) {
+    return null;
+  }
+}
+
 const deployCmd = program
   .command("deploy")
   .description("Faz o deploy de entidades para a plataforma GoClaw");
@@ -354,7 +367,8 @@ deployCmd
     }
   });
 
-async function deployContextFiles(slug: string, config: any) {
+async function deployContextFiles(slug: string, config: any, resolvedId?: string | null) {
+  const agentId = resolvedId || (await resolveAgentId(slug, config)) || slug;
   const basePath = getWorkspaceRoot();
   const agentPath = path.join(basePath, "agents", slug);
   if (!(await fs.pathExists(agentPath))) {
@@ -388,7 +402,7 @@ async function deployContextFiles(slug: string, config: any) {
     const form = new FormData();
     form.append("file", fs.createReadStream(tarPath));
 
-    const url = `${config.goclaw.api_url}/v1/agents/${slug}/import?include=context_files`;
+    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=context_files`;
     await axios.post(url, form, {
       headers: {
         ...form.getHeaders(),
@@ -446,18 +460,8 @@ deployCmd
     console.log(`🚀 Atualizando configuração do agente "${slug}"...`);
     
     try {
-      let exists = true;
-      try {
-         await axios.get(`${config.goclaw.api_url}/v1/agents/${slug}`, {
-           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-         });
-      } catch (e: any) {
-         if (e.response && e.response.status === 404) {
-           exists = false;
-         } else {
-           throw e;
-         }
-      }
+      const agentId = await resolveAgentId(slug, config);
+      const exists = agentId !== null;
 
       if (!exists) {
          await axios.post(`${config.goclaw.api_url}/v1/agents`, agentConfig, {
@@ -465,14 +469,14 @@ deployCmd
          });
          console.log("✅ Agente criado com sucesso.");
       } else {
-         await axios.put(`${config.goclaw.api_url}/v1/agents/${slug}`, agentConfig, {
+         await axios.put(`${config.goclaw.api_url}/v1/agents/${agentId}`, agentConfig, {
            headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
          });
          console.log("✅ Configurações do agente atualizadas.");
       }
 
       console.log(`🚀 Sincronizando arquivos de contexto...`);
-      await deployContextFiles(slug, config);
+      await deployContextFiles(slug, config, agentId);
 
       console.log("✅ Deploy completo concluído!");
     } catch (error: any) {
