@@ -677,6 +677,39 @@ pullCmd
             }
             await fs.remove(contextDir);
           }
+
+          // Reconstruir ficheiros de memória a partir de JSONL
+          const memoryDir = path.join(agentPath, "memory");
+          if (await fs.pathExists(memoryDir)) {
+            const processJsonl = async (filePath: string) => {
+              if (!(await fs.pathExists(filePath))) return;
+              const content = await fs.readFile(filePath, 'utf8');
+              const lines = content.split('\n').filter(l => l.trim());
+              for (const line of lines) {
+                try {
+                  const entry = JSON.parse(line);
+                  if (entry.path && entry.content) {
+                    const targetPath = path.join(agentPath, entry.path);
+                    await fs.ensureDir(path.dirname(targetPath));
+                    await fs.writeFile(targetPath, entry.content);
+                  }
+                } catch (e) {}
+              }
+              await fs.remove(filePath);
+            };
+
+            await processJsonl(path.join(memoryDir, "global.jsonl"));
+            const usersDir = path.join(memoryDir, "users");
+            if (await fs.pathExists(usersDir)) {
+              const userFiles = await fs.readdir(usersDir);
+              for (const uf of userFiles) {
+                if (uf.endsWith(".jsonl")) {
+                  await processJsonl(path.join(usersDir, uf));
+                }
+              }
+              await fs.remove(usersDir);
+            }
+          }
         } finally {
           if (await fs.pathExists(tempTarPath)) {
             await fs.remove(tempTarPath);
