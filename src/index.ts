@@ -163,7 +163,7 @@ newCmd
         const agentJson = {
           agent_key: slug,
           display_name: name,
-          agent_type: "custom",
+          agent_type: "predefined",
           status: "active",
           emoji: "🔥",
           context_window: 200000,
@@ -186,7 +186,7 @@ newCmd
         const agentJson = {
           agent_key: slug,
           display_name: name,
-          agent_type: "custom",
+          agent_type: "predefined",
           provider: config.goclaw?.default_provider || "ollama cloud",
           model: config.goclaw?.default_model || "deepseek-v4-pro",
           other_config: {
