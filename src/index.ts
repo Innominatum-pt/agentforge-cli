@@ -317,6 +317,53 @@ const deployCmd = program
 deployCmd
   .command("skill <slug>")
   .description("Faz o build da skill e envia para a API do GoClaw")
+async function deploySkill(slug: string, config: any, basePath: string) {
+  const skillPath = path.join(basePath, "skills", slug);
+  const exportsPath = path.join(basePath, "exports");
+  const safeSlug = slug.replace(/[\\\/]/g, '_');
+  const zipPath = path.join(exportsPath, `${safeSlug}.zip`);
+
+  if (!(await fs.pathExists(skillPath))) {
+    console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
+    return;
+  }
+  
+  await fs.ensureDir(exportsPath);
+  const zip = new AdmZip();
+  zip.addLocalFolder(skillPath, "");
+  zip.writeZip(zipPath);
+  
+  console.log(`🚀 Fazendo upload da skill "${slug}" para o GoClaw...`);
+  const form = new FormData();
+  form.append("file", fs.createReadStream(zipPath));
+
+  try {
+    const url = `${config.goclaw.api_url}/v1/skills/upload`;
+    const response = await axios.post(url, form, {
+      headers: {
+        ...form.getHeaders(),
+        Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
+      }
+    });
+    const data = response.data;
+    if (data && data.version) {
+      console.log(`✅ Skill "${slug}" atualizada para a versão ${data.version}.`);
+    } else {
+      console.log(`✅ Skill "${slug}" atualizada.`);
+    }
+  } catch (error: any) {
+    console.error(`❌ Erro no deploy da skill "${slug}":`);
+    if (error.response) {
+      console.error(error.response.data);
+    } else {
+      console.error(error.message);
+    }
+  }
+}
+
+deployCmd
+  .command("skill <slug>")
+  .description("Faz build e upload automático de uma skill para o GoClaw")
   .action(async (slug: string) => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
@@ -325,46 +372,7 @@ deployCmd
     }
 
     const basePath = getWorkspaceRoot();
-    const skillPath = path.join(basePath, "skills", slug);
-    const exportsPath = path.join(basePath, "exports");
-    const zipPath = path.join(exportsPath, `${slug}.zip`);
-
-    if (!(await fs.pathExists(skillPath))) {
-      console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
-      process.exit(1);
-    }
-    
-    await fs.ensureDir(exportsPath);
-    const zip = new AdmZip();
-    zip.addLocalFolder(skillPath, "");
-    zip.writeZip(zipPath);
-    
-    console.log(`✅ Build concluído: ${slug}.zip preparado para envio.`);
-
-    console.log(`🚀 Fazendo upload para o GoClaw...`);
-    const form = new FormData();
-    form.append("file", fs.createReadStream(zipPath));
-
-    try {
-      const url = `${config.goclaw.api_url}/v1/skills/upload`;
-      const response = await axios.post(url, form, {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
-        }
-      });
-      const data = response.data;
-      if (data && data.version) {
-        console.log(`📌 Skill atualizada para a versão ${data.version}.`);
-      }
-    } catch (error: any) {
-      console.error("❌ Erro durante o deploy:");
-      if (error.response) {
-        console.error(error.response.data);
-      } else {
-        console.error(error.message);
-      }
-    }
+    await deploySkill(slug, config, basePath);
   });
 
 async function deployContextFiles(slug: string, config: any, resolvedId?: string | null) {
@@ -530,20 +538,39 @@ deployCmd
     }
 
     const basePath = getWorkspaceRoot();
-    const agentsDir = path.join(basePath, "agents");
     
-    if (!(await fs.pathExists(agentsDir))) {
-      console.log("Nenhum agente encontrado em agents/.");
-      return;
+    // Deploy Agents
+    const agentsDir = path.join(basePath, "agents");
+    if (await fs.pathExists(agentsDir)) {
+      const agents = await fs.readdir(agentsDir);
+      console.log(`🚀 Iniciando deploy em lote de ${agents.length} agentes...`);
+      for (const slug of agents) {
+        const agentPath = path.join(agentsDir, slug);
+        if ((await fs.stat(agentPath)).isDirectory()) {
+           await deployAgent(slug, config);
+        }
+      }
     }
 
-    const agents = await fs.readdir(agentsDir);
-    console.log(`🚀 Iniciando deploy em lote de ${agents.length} agentes...`);
-    
-    for (const slug of agents) {
-      const agentPath = path.join(agentsDir, slug);
-      if ((await fs.stat(agentPath)).isDirectory()) {
-         await deployAgent(slug, config);
+    // Deploy Skills
+    const skillsDir = path.join(basePath, "skills");
+    if (await fs.pathExists(skillsDir)) {
+      const skills = await fs.readdir(skillsDir);
+      console.log(`🚀 Iniciando deploy em lote de skills...`);
+      for (const item of skills) {
+        const itemPath = path.join(skillsDir, item);
+        if ((await fs.stat(itemPath)).isDirectory()) {
+          if (item === "system") {
+            const systemSkills = await fs.readdir(itemPath);
+            for (const sysItem of systemSkills) {
+              if ((await fs.stat(path.join(itemPath, sysItem))).isDirectory()) {
+                await deploySkill(`system/${sysItem}`, config, basePath);
+              }
+            }
+          } else {
+            await deploySkill(item, config, basePath);
+          }
+        }
       }
     }
     

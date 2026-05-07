@@ -45,7 +45,7 @@ Downloads all agents and skills from the GoClaw server. It performs a **surgical
 ```bash
 agentforge deploy all
 ```
-Performs a full deployment (config + context + memory) for **all agents** found in your `agents/` directory. This is the most efficient way to synchronize your entire team after making cross-cutting changes.
+Performs a full deployment for **all agents and skills** found in your `agents/` and `skills/` directories. This is the most efficient way to synchronize your entire team and toolset after making cross-cutting changes.
 
 ### Agent Management
 ```bash
