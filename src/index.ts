@@ -376,33 +376,66 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
   }
 
   const files = await fs.readdir(agentPath);
-  const contextFiles = files.filter(f => f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.py')).filter(f => f !== 'README.md' && f !== 'agent.json');
+  
+  // Identificar ficheiros de contexto e de memória
+  const memoryFileNames = ['MEMORY.md', 'memory.md'];
+  const memoryDirName = 'memory';
+  
+  const contextFiles = files.filter(f => 
+    (f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.py')) && 
+    f !== 'README.md' && 
+    f !== 'agent.json' && 
+    !memoryFileNames.includes(f)
+  );
+  
+  const hasMemoryDir = await fs.pathExists(path.join(agentPath, memoryDirName));
+  const memoryFilesFound = files.filter(f => memoryFileNames.includes(f));
+  const hasMemory = hasMemoryDir || memoryFilesFound.length > 0;
 
-  if (contextFiles.length === 0) {
-    console.log(`Nenhum arquivo de contexto encontrado para "${slug}".`);
+  if (contextFiles.length === 0 && !hasMemory) {
+    console.log(`Nenhum ficheiro de contexto ou memória encontrado para "${slug}".`);
     return;
   }
 
   const tempExportDir = path.join(basePath, `temp_export_${slug}`);
   const tempContextDir = path.join(tempExportDir, "context_files");
+  const tempMemoryDir = path.join(tempExportDir, "memory");
   const tarPath = path.join(basePath, `temp_export_${slug}.tar.gz`);
 
   try {
-    await fs.ensureDir(tempContextDir);
-    for (const file of contextFiles) {
-      await fs.copy(path.join(agentPath, file), path.join(tempContextDir, file));
+    const sections: string[] = [];
+    
+    if (contextFiles.length > 0) {
+      sections.push("context_files");
+      await fs.ensureDir(tempContextDir);
+      for (const file of contextFiles) {
+        await fs.copy(path.join(agentPath, file), path.join(tempContextDir, file));
+      }
+    }
+
+    if (hasMemory) {
+      sections.push("memory");
+      await fs.ensureDir(tempMemoryDir);
+      // Copiar ficheiros de memória explícitos para a pasta memory no arquivo
+      for (const file of memoryFilesFound) {
+        await fs.copy(path.join(agentPath, file), path.join(tempMemoryDir, file));
+      }
+      // Copiar conteúdo da pasta memory se existir
+      if (hasMemoryDir) {
+        await fs.copy(path.join(agentPath, memoryDirName), tempMemoryDir);
+      }
     }
 
     await tar.c({
       gzip: true,
       file: tarPath,
       cwd: tempExportDir
-    }, ["context_files"]);
+    }, sections);
 
     const form = new FormData();
     form.append("file", fs.createReadStream(tarPath));
 
-    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=context_files`;
+    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=${sections.join(",")}`;
     await axios.post(url, form, {
       headers: {
         ...form.getHeaders(),
@@ -411,7 +444,7 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
       }
     });
 
-    console.log(`✅ Upload cirúrgico de ${contextFiles.length} arquivos concluído com sucesso!`);
+    console.log(`✅ Upload cirúrgico de ${contextFiles.length} ficheiros de contexto e ${hasMemory ? 'dados de memória' : 'sem memória'} concluído com sucesso!`);
   } finally {
     if (await fs.pathExists(tempExportDir)) await fs.remove(tempExportDir);
     if (await fs.pathExists(tarPath)) await fs.remove(tarPath);
@@ -607,7 +640,7 @@ pullCmd
         const slug = agent.agent_key;
         console.log(`📦 Baixando agente: ${slug}...`);
         
-        const url = `${config.goclaw.api_url}/v1/agents/${agent.id}/export`;
+        const url = `${config.goclaw.api_url}/v1/agents/${agent.id}/export?sections=config,context_files,memory`;
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
           responseType: "stream"
@@ -632,7 +665,7 @@ pullCmd
             cwd: agentPath,
             strip: 0, 
             filter: (path) => {
-              return path === 'agent.json' || path.startsWith('context_files/');
+              return path === 'agent.json' || path.startsWith('context_files/') || path.startsWith('memory/') || path === 'MEMORY.md' || path === 'memory.md';
             }
           });
           
