@@ -541,7 +541,9 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
           // O ficheiro físico no tempExportDir está achatado (memory_arquivo.md)
           const flatFileName = localPath.replace("memory/", "memory_");
           const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
-          const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(localPath)}`;
+          
+          // O endpoint usa {path...} portanto não podemos fazer URL encode das barras
+          const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${localPath}`;
           await axios.put(putUrl, { content }, {
             headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
           });
