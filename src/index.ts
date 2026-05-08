@@ -570,18 +570,15 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
         
         // Verifica se o ficheiro remoto existe na nossa lista de ficheiros locais
         if (!localFilePaths.includes(doc.path)) {
-          if (doc.path.includes("/")) {
-            // BUG CONHECIDO NO GOCLAW:
-            // O endpoint de eliminação retorna 500 Internal Server Error quando o caminho do documento contém barras.
-            // Não há forma de apagar memórias e ficheiros de sistema (que têm barras) através da API atual.
-            console.warn(`⚠️ Não é possível apagar a memória remota: ${doc.path} (Bug no GoClaw impede eliminação de caminhos com barras)`);
-            continue;
-          }
-
-          console.log(`🧹 Removendo ficheiro órfão no servidor: ${doc.path}`);
-          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(doc.path)}`;
+          console.log(`🧹 Esvaziando memória órfã no servidor: ${doc.path} (Soft-delete ativo)`);
+          
           try {
-            await axios.delete(deleteUrl, {
+            // BUG CONHECIDO NO GOCLAW:
+            // O endpoint DELETE falha ao processar caminhos com barras (500 Internal Server Error).
+            // A nossa solução (workaround) é usar o endpoint PUT para substituir o conteúdo
+            // da memória por texto vazio, neutralizando assim a memória do agente.
+            const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(doc.path)}`;
+            await axios.put(putUrl, { content: " " }, {
               headers: {
                 Authorization: `Bearer ${config.goclaw.token}`,
                 "X-GoClaw-User-Id": config.goclaw.username || "system"
@@ -589,7 +586,7 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
             });
             deletedCount++;
           } catch (delErr: any) {
-            console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
+            console.warn(`⚠️ Não foi possível neutralizar ${doc.path}: ${delErr.message}`);
           }
         }
       }
