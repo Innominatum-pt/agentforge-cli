@@ -1058,12 +1058,17 @@ pullCmd
           
           const contextDir = path.join(agentPath, 'context_files');
           if (await fs.pathExists(contextDir)) {
-            const contextFiles = await fs.readdir(contextDir);
             for (const f of contextFiles) {
-              const truePath = pathMap[f] ? pathMap[f] : f;
-              const targetPath = path.join(agentPath, truePath);
-              await fs.ensureDir(path.dirname(targetPath));
-              await fs.move(path.join(contextDir, f), targetPath, { overwrite: true });
+              if (pathMap[f]) {
+                const targetPath = path.join(agentPath, pathMap[f]);
+                await fs.ensureDir(path.dirname(targetPath));
+                await fs.move(path.join(contextDir, f), targetPath, { overwrite: true });
+              } else if (f.startsWith('_system_') || f.startsWith('memory_')) {
+                // É um stub de diretório do export do GoClaw (ex: _system_dreaming_) ou um órfão esmagado. Ignoramos.
+                await fs.remove(path.join(contextDir, f));
+              } else {
+                await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+              }
             }
             await fs.remove(contextDir);
           }
