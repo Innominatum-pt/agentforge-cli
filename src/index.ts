@@ -434,66 +434,53 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
   }
 
   const files = await fs.readdir(agentPath);
-  
-  // Identificar ficheiros de contexto e de memória
-  const memoryFileNames = ['MEMORY.md', 'memory.md'];
-  const memoryDirName = 'memory';
-  
-  const contextFiles = files.filter(f => 
-    (f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.py')) && 
-    f !== 'README.md' && 
-    f !== 'agent.json' && 
-    !memoryFileNames.includes(f)
-  );
-  
-  const hasMemoryDir = await fs.pathExists(path.join(agentPath, memoryDirName));
-  const memoryFilesFound = files.filter(f => memoryFileNames.includes(f));
-  const hasMemory = hasMemoryDir || memoryFilesFound.length > 0;
+  const itemsToSync = files.filter(f => f !== 'agent.json' && f !== 'README.md');
 
-  if (contextFiles.length === 0 && !hasMemory) {
+  if (itemsToSync.length === 0) {
     console.log(`Nenhum ficheiro de contexto ou memória encontrado para "${slug}".`);
     return;
   }
 
   const tempExportDir = path.join(basePath, `temp_export_${slug}`);
   const tempContextDir = path.join(tempExportDir, "context_files");
-  const tempMemoryDir = path.join(tempExportDir, "memory");
   const tarPath = path.join(basePath, `temp_export_${slug}.tar.gz`);
 
-  try {
-    const sections: string[] = [];
-    
-    if (contextFiles.length > 0) {
-      sections.push("context_files");
-      await fs.ensureDir(tempContextDir);
-      for (const file of contextFiles) {
-        await fs.copy(path.join(agentPath, file), path.join(tempContextDir, file));
+  // Guardar lista de ficheiros locais para pruning
+  const localFilePaths: string[] = [];
+  async function collectFiles(dir: string, baseDir: string) {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+      if (entry.isDirectory()) {
+        await collectFiles(fullPath, baseDir);
+      } else {
+        localFilePaths.push(relativePath);
       }
     }
+  }
 
-    if (hasMemory) {
-      sections.push("memory");
-      await fs.ensureDir(tempMemoryDir);
-      // Copiar ficheiros de memória explícitos para a pasta memory no arquivo
-      for (const file of memoryFilesFound) {
-        await fs.copy(path.join(agentPath, file), path.join(tempMemoryDir, file));
-      }
-      // Copiar conteúdo da pasta memory se existir
-      if (hasMemoryDir) {
-        await fs.copy(path.join(agentPath, memoryDirName), tempMemoryDir);
-      }
+  try {
+    await fs.ensureDir(tempContextDir);
+    for (const item of itemsToSync) {
+      const itemPath = path.join(agentPath, item);
+      await fs.copy(itemPath, path.join(tempContextDir, item));
     }
+    
+    // Coletar todos os caminhos relativos para pruning futuro
+    await collectFiles(tempContextDir, tempContextDir);
 
     await tar.c({
       gzip: true,
       file: tarPath,
       cwd: tempExportDir
-    }, sections);
+    }, ["context_files"]);
 
     const form = new FormData();
     form.append("file", fs.createReadStream(tarPath));
 
-    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=${sections.join(",")}`;
+    // Upload dos ficheiros (aditivo)
+    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=context_files`;
     await axios.post(url, form, {
       headers: {
         ...form.getHeaders(),
@@ -502,7 +489,44 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
       }
     });
 
-    console.log(`✅ Upload cirúrgico de ${contextFiles.length} ficheiros de contexto e ${hasMemory ? 'dados de memória' : 'sem memória'} concluído com sucesso!`);
+    console.log(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
+
+    // --- Início do Pruning (Remover ficheiros órfãos do servidor) ---
+    try {
+      const documentsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
+      const docsResponse = await axios.get(documentsUrl, {
+        headers: {
+          Authorization: `Bearer ${config.goclaw.token}`,
+          "X-GoClaw-User-Id": config.goclaw.username || "system"
+        }
+      });
+      
+      const remoteDocs = docsResponse.data || [];
+      let deletedCount = 0;
+      
+      for (const doc of remoteDocs) {
+        if (!doc.path) continue;
+        
+        // Verifica se o ficheiro remoto existe na nossa lista de ficheiros locais
+        if (!localFilePaths.includes(doc.path)) {
+          console.log(`🧹 Removendo ficheiro órfão no servidor: ${doc.path}`);
+          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(doc.path)}`;
+          await axios.delete(deleteUrl, {
+            headers: {
+              Authorization: `Bearer ${config.goclaw.token}`,
+              "X-GoClaw-User-Id": config.goclaw.username || "system"
+            }
+          });
+          deletedCount++;
+        }
+      }
+      if (deletedCount > 0) {
+        console.log(`✅ Pruning concluído: ${deletedCount} ficheiro(s) apagado(s) do GoClaw.`);
+      }
+    } catch (pruneErr: any) {
+      console.warn(`⚠️ Aviso: Falha ao fazer pruning das memórias: ${pruneErr.message}`);
+    }
+
   } finally {
     if (await fs.pathExists(tempExportDir)) await fs.remove(tempExportDir);
     if (await fs.pathExists(tarPath)) await fs.remove(tarPath);
