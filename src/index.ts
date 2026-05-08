@@ -1033,7 +1033,11 @@ pullCmd
           });
 
           const agentPath = path.join(getWorkspaceRoot(), 'agents', slug);
-          await fs.ensureDir(agentPath);
+          if (await fs.pathExists(agentPath)) {
+            await fs.emptyDir(agentPath);
+          } else {
+            await fs.ensureDir(agentPath);
+          }
 
           // Obter os caminhos reais (com barras) da API para reverter o flattening do export
           const docsRes = await axios.get(`${config.goclaw.api_url}/v1/agents/${agent.id}/memory/documents`, {
