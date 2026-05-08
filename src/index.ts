@@ -478,11 +478,18 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
       await fs.ensureDir(targetDir);
       
       if (isDir) {
-        // Copiar a pasta inteira para dentro de context_files mantendo o nome
-        // Ex: agents/mazikeen/memory -> tempExportDir/context_files/memory
-        const itemTargetDir = path.join(targetDir, item);
-        await fs.ensureDir(itemTargetDir);
-        await fs.copy(itemPath, itemTargetDir);
+        // Obter todos os ficheiros da pasta (ex: memory, _system)
+        // e achatá-os (flatten) com o nome da pasta como prefixo (ex: memory_arquivo.md)
+        // O GoClaw espera que os ficheiros de contexto não tenham pastas, mas sim prefixos achatados!
+        const subFiles = await fs.readdir(itemPath);
+        for (const sub of subFiles) {
+          const subPath = path.join(itemPath, sub);
+          const isSubDir = (await fs.stat(subPath)).isDirectory();
+          if (!isSubDir) {
+            const flatName = `${item}_${sub}`;
+            await fs.copy(subPath, path.join(targetDir, flatName));
+          }
+        }
       } else {
         await fs.copy(itemPath, path.join(targetDir, item));
       }
@@ -492,7 +499,16 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
     const sectionDir = path.join(tempExportDir, "context_files");
     const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
     for (const entry of sectionEntries) {
-      localFilePaths.push(entry);
+      // O GoClaw retorna os caminhos das memórias com barras (memory/arquivo.md)
+      // Nós achatamos para o upload (memory_arquivo.md). Para o pruning não apagar ficheiros
+      // válidos acidentalmente, temos que re-mapear o nome achatado para a versão com barra.
+      let finalEntry = entry;
+      if (entry.startsWith("memory_")) {
+        finalEntry = entry.replace("memory_", "memory/");
+      } else if (entry.startsWith("_system_")) {
+        finalEntry = entry.replace("_system_", "_system/");
+      }
+      localFilePaths.push(finalEntry);
     }
 
     const sectionsArray = Array.from(sections);
@@ -522,7 +538,9 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
     for (const localPath of localFilePaths) {
       if (localPath.startsWith('memory/') && localPath.endsWith('.md')) {
         try {
-          const content = await fs.readFile(path.join(sectionDir, localPath), 'utf8');
+          // O ficheiro físico no tempExportDir está achatado (memory_arquivo.md)
+          const flatFileName = localPath.replace("memory/", "memory_");
+          const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
           const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(localPath)}`;
           await axios.put(putUrl, { content }, {
             headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
