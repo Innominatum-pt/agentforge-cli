@@ -513,6 +513,31 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
 
     const sectionsArray = Array.from(sections);
 
+    // --- HACK PARA APAGAR FICHEIROS FÍSICOS DO GOCLAW ---
+    // O GoClaw não apaga ficheiros do disco (context_files) quando os apagamos da DB (memory_documents).
+    // Isto faz com que os ficheiros voltem como "fantasmas" durante o pull.
+    // Solução: Injetar ficheiros vazios no tarball para os órfãos, forçando o /import a esmagá-los com 0 bytes!
+    try {
+      const docsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
+      const preDocsRes = await axios.get(docsUrl, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+      });
+      const preDocs = preDocsRes.data || [];
+      for (const pDoc of preDocs) {
+        if (pDoc.path && !localFilePaths.includes(pDoc.path)) {
+          const flatGhost = pDoc.path.replace(/[\/\\]/g, '_');
+          const ghostPath = path.join(tempExportDir, "context_files", flatGhost);
+          await fs.ensureDir(path.dirname(ghostPath));
+          await fs.writeFile(ghostPath, " "); // 1 byte soft-delete payload
+          if (!sectionsArray.includes("context_files")) {
+            sectionsArray.push("context_files");
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn("Aviso: Falha ao procurar fantasmas para o tarball.", e.message);
+    }
+
     await tar.c({
       gzip: true,
       file: tarPath,
@@ -586,7 +611,12 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
             });
             deletedCount++;
           } catch (delErr: any) {
-            console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
+            const errorData = delErr.response?.data?.error || "";
+            if (delErr.response?.status === 500 && errorData.includes("not found")) {
+              console.log(`✅ ${doc.path} já estava removido da base de dados.`);
+            } else {
+              console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
+            }
           }
         }
       }
@@ -928,15 +958,26 @@ async function pullAgent(slug: string, agentId: string, config: any) {
     if (await fs.pathExists(contextDir)) {
       const contextFiles = await fs.readdir(contextDir);
       for (const f of contextFiles) {
+        const filePath = path.join(contextDir, f);
+        const stat = await fs.stat(filePath);
+        if (stat.isFile()) {
+          const content = await fs.readFile(filePath, 'utf8');
+          if (content === " " || content === "") {
+            // Fantasma neutralizado pelo nosso script de deploy! Deita fora!
+            await fs.remove(filePath);
+            continue;
+          }
+        }
+
         if (pathMap[f]) {
           const targetPath = path.join(agentPath, pathMap[f]);
           await fs.ensureDir(path.dirname(targetPath));
-          await fs.move(path.join(contextDir, f), targetPath, { overwrite: true });
+          await fs.move(filePath, targetPath, { overwrite: true });
         } else if (f.startsWith('_system_') || f.startsWith('memory_')) {
           // É um stub de diretório do export do GoClaw (ex: _system_dreaming_) ou um órfão esmagado. Ignoramos.
-          await fs.remove(path.join(contextDir, f));
+          await fs.remove(filePath);
         } else {
-          await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+          await fs.move(filePath, path.join(agentPath, f), { overwrite: true });
         }
       }
       await fs.remove(contextDir);
