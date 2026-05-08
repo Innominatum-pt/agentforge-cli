@@ -11,7 +11,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
-      contents: read
+      contents: write
       id-token: write # Required for NPM Trusted Publishing (OIDC)
     steps:
       - name: Checkout code
@@ -28,6 +28,20 @@ jobs:
 
       - name: Build TypeScript code
         run: npm run build
+
+      - name: Auto-bump version if already published
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          PUBLISHED_VERSION=$(npm view @innominatum/agentforge-cli version 2>/dev/null || echo "0.0.0")
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PUBLISHED_VERSION" = "$CURRENT_VERSION" ]; then
+            echo "Version $CURRENT_VERSION is already published. Bumping patch version..."
+            npm version patch -m "chore: auto-bump version to %s [skip ci]"
+            git push --follow-tags
+          else
+            echo "Version $CURRENT_VERSION is not published yet. Proceeding with publish..."
+          fi
 
       - name: Publish to NPM
         run: npm publish --access public --provenance
