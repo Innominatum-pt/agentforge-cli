@@ -570,23 +570,21 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
         
         // Verifica se o ficheiro remoto existe na nossa lista de ficheiros locais
         if (!localFilePaths.includes(doc.path)) {
-          console.log(`🧹 Esvaziando memória órfã no servidor: ${doc.path} (Soft-delete ativo)`);
+          console.log(`🧹 Removendo memória órfã no servidor: ${doc.path}`);
           
           try {
-            // BUG CONHECIDO NO GOCLAW:
-            // O endpoint DELETE falha ao processar caminhos com barras (500 Internal Server Error).
-            // A nossa solução (workaround) é usar o endpoint PUT para substituir o conteúdo
-            // da memória por texto vazio, neutralizando assim a memória do agente.
-            const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(doc.path)}`;
-            await axios.put(putUrl, { content: " " }, {
+            // O endpoint do GoClaw espera o caminho exato sem URL encode (route genérica {path...})
+            // E é mandatório passar o user_id dono do documento, senão dá erro 500.
+            const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${doc.path}`;
+            await axios.delete(deleteUrl, {
               headers: {
                 Authorization: `Bearer ${config.goclaw.token}`,
-                "X-GoClaw-User-Id": config.goclaw.username || "system"
+                "X-GoClaw-User-Id": doc.user_id || config.goclaw.username || "system"
               }
             });
             deletedCount++;
           } catch (delErr: any) {
-            console.warn(`⚠️ Não foi possível neutralizar ${doc.path}: ${delErr.message}`);
+            console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
           }
         }
       }
