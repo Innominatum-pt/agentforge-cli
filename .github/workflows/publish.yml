@@ -1,12 +1,9 @@
 name: Publish Package to npmjs
 
 on:
-  release:
-    types: [published]
-  # Alternatively, you can uncomment the following to publish whenever you push to main
-  # push:
-  #   branches:
-  #     - main
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build-and-publish:
