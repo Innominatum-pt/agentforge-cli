@@ -471,40 +471,28 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
       const itemPath = path.join(agentPath, item);
       const isDir = (await fs.stat(itemPath)).isDirectory();
       
-      let section = "context_files";
-      if (isDir && (item === "memory" || item === "_system")) {
-        section = item;
-      }
-      
+      const section = "context_files";
       sections.add(section);
+      
       const targetDir = path.join(tempExportDir, section);
       await fs.ensureDir(targetDir);
       
-      if (isDir && section !== "context_files") {
-        // Se for uma pasta que é a sua própria secção (memory, _system),
-        // o conteúdo vai DIRETAMENTE para a raiz dessa secção.
-        // Ex: agents/mazikeen/memory/file.md -> tempExportDir/memory/file.md
-        const subFiles = await fs.readdir(itemPath);
-        for (const sub of subFiles) {
-          await fs.copy(path.join(itemPath, sub), path.join(targetDir, sub));
-        }
+      if (isDir) {
+        // Copiar a pasta inteira para dentro de context_files mantendo o nome
+        // Ex: agents/mazikeen/memory -> tempExportDir/context_files/memory
+        const itemTargetDir = path.join(targetDir, item);
+        await fs.ensureDir(itemTargetDir);
+        await fs.copy(itemPath, itemTargetDir);
       } else {
-        // Context files normais vão para tempExportDir/context_files/item
         await fs.copy(itemPath, path.join(targetDir, item));
       }
     }
 
-    // Coletar ficheiros para pruning, respeitando os prefixos originais
-    for (const section of sections) {
-      const sectionDir = path.join(tempExportDir, section);
-      const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
-      for (const entry of sectionEntries) {
-        if (section === "context_files") {
-          localFilePaths.push(entry);
-        } else {
-          localFilePaths.push(`${section}/${entry}`);
-        }
-      }
+    // Coletar ficheiros para pruning
+    const sectionDir = path.join(tempExportDir, "context_files");
+    const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
+    for (const entry of sectionEntries) {
+      localFilePaths.push(entry);
     }
 
     const sectionsArray = Array.from(sections);
@@ -548,8 +536,16 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
         
         // Verifica se o ficheiro remoto existe na nossa lista de ficheiros locais
         if (!localFilePaths.includes(doc.path)) {
+          if (doc.path.includes("/")) {
+            // BUG CONHECIDO NO GOCLAW:
+            // O endpoint de eliminação retorna 500 Internal Server Error quando o caminho do documento contém barras.
+            // Não há forma de apagar memórias e ficheiros de sistema (que têm barras) através da API atual.
+            console.warn(`⚠️ Não é possível apagar a memória remota: ${doc.path} (Bug no GoClaw impede eliminação de caminhos com barras)`);
+            continue;
+          }
+
           console.log(`🧹 Removendo ficheiro órfão no servidor: ${doc.path}`);
-          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${doc.path}`;
+          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(doc.path)}`;
           try {
             await axios.delete(deleteUrl, {
               headers: {
@@ -730,6 +726,97 @@ const pullCmd = program
   .command("pull")
   .description("Sincroniza entidades do GoClaw para o workspace local");
 
+async function pullAllSkills(config: any) {
+  console.log("🧹 Limpando a pasta local de skills...");
+  await fs.emptyDir(path.join(getWorkspaceRoot(), "skills"));
+
+  console.log("📥 Baixando skills do GoClaw...");
+  const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
+  const response = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
+    },
+    responseType: "stream"
+  });
+
+  const tempTarPath = path.join(getWorkspaceRoot(), "temp_skills.tar.gz");
+  const writer = fs.createWriteStream(tempTarPath);
+  response.data.pipe(writer);
+
+  await new Promise((resolve, reject) => {
+    writer.on("finish", resolve);
+    writer.on("error", reject);
+  });
+
+  console.log("📦 Extraindo skills para a pasta local...");
+  await tar.x({
+    file: tempTarPath,
+    cwd: getWorkspaceRoot()
+  });
+  await fs.remove(tempTarPath);
+
+  console.log("📥 Baixando ficheiros de código das skills...");
+  const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
+    headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+  });
+  
+  const skills = skillsListRes.data.skills || [];
+  for (const skill of skills) {
+    try {
+      const isSystem = skill.is_system === true;
+      const targetFolder = isSystem ? path.join("system", skill.slug) : skill.slug;
+      
+      if (isSystem) {
+        const originalPath = path.join(getWorkspaceRoot(), "skills", skill.slug);
+        const newPath = path.join(getWorkspaceRoot(), "skills", targetFolder);
+        if (await fs.pathExists(originalPath)) {
+          await fs.ensureDir(path.dirname(newPath));
+          await fs.move(originalPath, newPath, { overwrite: true });
+        }
+      }
+
+      const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
+        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+      });
+      
+      const files = filesRes.data.files || [];
+      for (const file of files) {
+        if (file.isDir) continue;
+        const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
+          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+        });
+        const filePath = path.join(getWorkspaceRoot(), "skills", targetFolder, file.path);
+        await fs.ensureDir(path.dirname(filePath));
+        await fs.writeFile(filePath, fileContentRes.data.content || "");
+      }
+    } catch (fileErr: any) {
+      console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
+    }
+  }
+
+  // Remover quaisquer skills fantasmas que o tarball tenha extraído
+  const validSlugs = new Set(skills.map((s: any) => s.is_system === true ? path.join("system", s.slug) : s.slug));
+  const skillsDir = path.join(getWorkspaceRoot(), "skills");
+  if (await fs.pathExists(skillsDir)) {
+    const localItems = await fs.readdir(skillsDir);
+    for (const item of localItems) {
+      if (item === "system") {
+        const systemDir = path.join(skillsDir, "system");
+        if (await fs.pathExists(systemDir)) {
+          const systemItems = await fs.readdir(systemDir);
+          for (const sysItem of systemItems) {
+            if (!validSlugs.has(path.join("system", sysItem))) {
+              await fs.remove(path.join(systemDir, sysItem));
+            }
+          }
+        }
+      } else if (!validSlugs.has(item)) {
+        await fs.remove(path.join(skillsDir, item));
+      }
+    }
+  }
+}
+
 pullCmd
   .command("skills")
   .description("Faz download do arquivo tar.gz de skills do GoClaw e extrai localmente")
@@ -745,97 +832,9 @@ pullCmd
       return;
     }
 
-    console.log("🧹 Limpando a pasta local de skills...");
-    await fs.emptyDir(path.join(getWorkspaceRoot(), "skills"));
-
-    console.log("📥 Baixando skills do GoClaw...");
     try {
-      const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
-        },
-        responseType: "stream"
-      });
-
-      const tempTarPath = path.join(getWorkspaceRoot(), "temp_skills.tar.gz");
-      const writer = fs.createWriteStream(tempTarPath);
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on("finish", resolve);
-        writer.on("error", reject);
-      });
-
-      console.log("📦 Extraindo skills para a pasta local...");
-      await tar.x({
-        file: tempTarPath,
-        cwd: getWorkspaceRoot() 
-      });
-      await fs.remove(tempTarPath);
-
-      console.log("📥 Baixando ficheiros de código das skills...");
-      const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-      });
-      
-      const skills = skillsListRes.data.skills || [];
-      for (const skill of skills) {
-        try {
-          const isSystem = skill.is_system === true;
-          const targetFolder = isSystem ? path.join("system", skill.slug) : skill.slug;
-          
-          if (isSystem) {
-            const originalPath = path.join(getWorkspaceRoot(), "skills", skill.slug);
-            const newPath = path.join(getWorkspaceRoot(), "skills", targetFolder);
-            if (await fs.pathExists(originalPath)) {
-              await fs.ensureDir(path.dirname(newPath));
-              await fs.move(originalPath, newPath, { overwrite: true });
-            }
-          }
-
-          const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
-            headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-          });
-          
-          const files = filesRes.data.files || [];
-          for (const file of files) {
-            if (file.isDir) continue;
-            const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
-              headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-            });
-            const filePath = path.join(getWorkspaceRoot(), "skills", targetFolder, file.path);
-            await fs.ensureDir(path.dirname(filePath));
-            await fs.writeFile(filePath, fileContentRes.data.content || "");
-          }
-        } catch (fileErr: any) {
-          console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
-        }
-      }
-
-      // Remover quaisquer skills fantasmas que o tarball tenha extraído (skills apagadas mas ainda no export)
-      const validSlugs = new Set(skills.map((s: any) => s.is_system === true ? path.join("system", s.slug) : s.slug));
-      const skillsDir = path.join(getWorkspaceRoot(), "skills");
-      if (await fs.pathExists(skillsDir)) {
-        const localItems = await fs.readdir(skillsDir);
-        for (const item of localItems) {
-          if (item === "system") {
-            const systemDir = path.join(skillsDir, "system");
-            if (await fs.pathExists(systemDir)) {
-              const systemItems = await fs.readdir(systemDir);
-              for (const sysItem of systemItems) {
-                if (!validSlugs.has(path.join("system", sysItem))) {
-                  await fs.remove(path.join(systemDir, sysItem));
-                }
-              }
-            }
-          } else if (!validSlugs.has(item)) {
-            await fs.remove(path.join(skillsDir, item));
-          }
-        }
-      }
-
-      console.log("✅ Pull concluído com sucesso! As skills foram atualizadas localmente.");
+      await pullAllSkills(config);
+      console.log("✅ Pull de skills concluído com sucesso! As skills foram atualizadas localmente.");
     } catch (error: any) {
       console.error("❌ Erro durante o pull das skills:");
       if (error.response) {
@@ -845,6 +844,78 @@ pullCmd
       }
     }
   });
+
+async function pullAgent(slug: string, agentId: string, config: any) {
+  console.log(`📦 Baixando agente: ${slug}...`);
+  
+  const url = `${config.goclaw.api_url}/v1/agents/${agentId}/export`;
+  const response = await axios.get(url, {
+    headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
+    responseType: "stream"
+  });
+
+  const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
+  
+  try {
+    const writer = fs.createWriteStream(tempTarPath);
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+    });
+
+    const agentPath = path.join(getWorkspaceRoot(), "agents", slug);
+    if (await fs.pathExists(agentPath)) {
+      await fs.emptyDir(agentPath);
+    } else {
+      await fs.ensureDir(agentPath);
+    }
+
+    // Obter os caminhos reais (com barras) da API para reverter o flattening do export
+    const docsRes = await axios.get(`${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`, {
+      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+    });
+    const pathMap: Record<string, string> = {};
+    (docsRes.data || []).forEach((d: any) => {
+      if (d.path) {
+        const flat = d.path.replace(/[\/\\]/g, '_');
+        pathMap[flat] = d.path;
+      }
+    });
+
+    await tar.x({
+      file: tempTarPath,
+      cwd: agentPath,
+      strip: 0,
+      filter: (path) => {
+        return path === 'agent.json' || path.startsWith('context_files/');
+      }
+    });
+    
+    const contextDir = path.join(agentPath, "context_files");
+    if (await fs.pathExists(contextDir)) {
+      const contextFiles = await fs.readdir(contextDir);
+      for (const f of contextFiles) {
+        if (pathMap[f]) {
+          const targetPath = path.join(agentPath, pathMap[f]);
+          await fs.ensureDir(path.dirname(targetPath));
+          await fs.move(path.join(contextDir, f), targetPath, { overwrite: true });
+        } else if (f.startsWith('_system_') || f.startsWith('memory_')) {
+          // É um stub de diretório do export do GoClaw (ex: _system_dreaming_) ou um órfão esmagado. Ignoramos.
+          await fs.remove(path.join(contextDir, f));
+        } else {
+          await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+        }
+      }
+      await fs.remove(contextDir);
+    }
+  } finally {
+    if (await fs.pathExists(tempTarPath)) {
+      await fs.remove(tempTarPath);
+    }
+  }
+}
 
 pullCmd
   .command("agents")
@@ -875,84 +946,9 @@ pullCmd
 
       for (const agent of agents) {
         const slug = agent.agent_key;
-        console.log(`📦 Baixando agente: ${slug}...`);
-        
-        const url = `${config.goclaw.api_url}/v1/agents/${agent.id}/export?sections=config,context_files,memory`;
-        const response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
-          responseType: "stream"
-        });
-
-        const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
-        
-        try {
-          const writer = fs.createWriteStream(tempTarPath);
-          response.data.pipe(writer);
-
-          await new Promise((resolve, reject) => {
-            writer.on("finish", resolve);
-            writer.on("error", reject);
-          });
-
-          const agentPath = path.join(getWorkspaceRoot(), "agents", slug);
-          await fs.ensureDir(agentPath);
-
-          await tar.x({
-            file: tempTarPath,
-            cwd: agentPath,
-            strip: 0, 
-            filter: (path) => {
-              return path === 'agent.json' || path.startsWith('context_files/') || path.startsWith('memory/') || path === 'MEMORY.md' || path === 'memory.md';
-            }
-          });
-          
-          const contextDir = path.join(agentPath, "context_files");
-          if (await fs.pathExists(contextDir)) {
-            const contextFiles = await fs.readdir(contextDir);
-            for (const f of contextFiles) {
-              await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
-            }
-            await fs.remove(contextDir);
-          }
-
-          // Reconstruir ficheiros de memória a partir de JSONL
-          const memoryDir = path.join(agentPath, "memory");
-          if (await fs.pathExists(memoryDir)) {
-            const processJsonl = async (filePath: string) => {
-              if (!(await fs.pathExists(filePath))) return;
-              const content = await fs.readFile(filePath, 'utf8');
-              const lines = content.split('\n').filter(l => l.trim());
-              for (const line of lines) {
-                try {
-                  const entry = JSON.parse(line);
-                  if (entry.path && entry.content) {
-                    const targetPath = path.join(agentPath, entry.path);
-                    await fs.ensureDir(path.dirname(targetPath));
-                    await fs.writeFile(targetPath, entry.content);
-                  }
-                } catch (e) {}
-              }
-              await fs.remove(filePath);
-            };
-
-            await processJsonl(path.join(memoryDir, "global.jsonl"));
-            const usersDir = path.join(memoryDir, "users");
-            if (await fs.pathExists(usersDir)) {
-              const userFiles = await fs.readdir(usersDir);
-              for (const uf of userFiles) {
-                if (uf.endsWith(".jsonl")) {
-                  await processJsonl(path.join(usersDir, uf));
-                }
-              }
-              await fs.remove(usersDir);
-            }
-          }
-        } finally {
-          if (await fs.pathExists(tempTarPath)) {
-            await fs.remove(tempTarPath);
-          }
-        }
+        await pullAgent(slug, agent.id, config);
       }
+
       console.log("✅ Pull de agentes concluído com sucesso!");
     } catch (error: any) {
       if (error.response && error.response.status) {
@@ -984,61 +980,7 @@ pullCmd
     // PULL SKILLS INLINE
     console.log('\n--- [1/2] SKILLS ---');
     try {
-      const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' },
-        responseType: 'stream'
-      });
-
-      const tempTarPath = path.join(getWorkspaceRoot(), 'temp_skills.tar.gz');
-      const writer = fs.createWriteStream(tempTarPath);
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      await tar.x({ file: tempTarPath, cwd: getWorkspaceRoot() });
-      await fs.remove(tempTarPath);
-
-      const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
-      });
-      
-      const skills = skillsListRes.data.skills || [];
-      for (const skill of skills) {
-        try {
-          const isSystem = skill.is_system === true;
-          const targetFolder = isSystem ? path.join('system', skill.slug) : skill.slug;
-          
-          if (isSystem) {
-            const originalPath = path.join(getWorkspaceRoot(), 'skills', skill.slug);
-            const newPath = path.join(getWorkspaceRoot(), 'skills', targetFolder);
-            if (await fs.pathExists(originalPath)) {
-              await fs.ensureDir(path.dirname(newPath));
-              await fs.move(originalPath, newPath, { overwrite: true });
-            }
-          }
-
-          const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
-            headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
-          });
-          
-          const files = filesRes.data.files || [];
-          for (const file of files) {
-            if (file.isDir) continue;
-            const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
-              headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
-            });
-            const filePath = path.join(getWorkspaceRoot(), 'skills', targetFolder, file.path);
-            await fs.ensureDir(path.dirname(filePath));
-            await fs.writeFile(filePath, fileContentRes.data.content || '');
-          }
-        } catch (fileErr: any) {
-          console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
-        }
-      }
+      await pullAllSkills(config);
       console.log('✅ Pull de skills concluído!');
     } catch (error: any) {
       console.error('❌ Erro durante o pull das skills:', error.message);
@@ -1056,75 +998,7 @@ pullCmd
 
       for (const agent of agents) {
         const slug = agent.agent_key;
-        console.log(`📦 Baixando agente: ${slug}...`);
-        
-        const url = `${config.goclaw.api_url}/v1/agents/${agent.id}/export`;
-        const response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' },
-          responseType: 'stream'
-        });
-
-        const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
-        
-        try {
-          const writer = fs.createWriteStream(tempTarPath);
-          response.data.pipe(writer);
-
-          await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-          });
-
-          const agentPath = path.join(getWorkspaceRoot(), 'agents', slug);
-          if (await fs.pathExists(agentPath)) {
-            await fs.emptyDir(agentPath);
-          } else {
-            await fs.ensureDir(agentPath);
-          }
-
-          // Obter os caminhos reais (com barras) da API para reverter o flattening do export
-          const docsRes = await axios.get(`${config.goclaw.api_url}/v1/agents/${agent.id}/memory/documents`, {
-            headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
-          });
-          const pathMap: Record<string, string> = {};
-          (docsRes.data || []).forEach((d: any) => {
-            if (d.path) {
-              const flat = d.path.replace(/[\/\\]/g, '_');
-              pathMap[flat] = d.path;
-            }
-          });
-
-          await tar.x({
-            file: tempTarPath,
-            cwd: agentPath,
-            strip: 0, 
-            filter: (path) => {
-              return path === 'agent.json' || path.startsWith('context_files/');
-            }
-          });
-          
-          const contextDir = path.join(agentPath, 'context_files');
-          if (await fs.pathExists(contextDir)) {
-            const contextFiles = await fs.readdir(contextDir);
-            for (const f of contextFiles) {
-              if (pathMap[f]) {
-                const targetPath = path.join(agentPath, pathMap[f]);
-                await fs.ensureDir(path.dirname(targetPath));
-                await fs.move(path.join(contextDir, f), targetPath, { overwrite: true });
-              } else if (f.startsWith('_system_') || f.startsWith('memory_')) {
-                // É um stub de diretório do export do GoClaw (ex: _system_dreaming_) ou um órfão esmagado. Ignoramos.
-                await fs.remove(path.join(contextDir, f));
-              } else {
-                await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
-              }
-            }
-            await fs.remove(contextDir);
-          }
-        } finally {
-          if (await fs.pathExists(tempTarPath)) {
-            await fs.remove(tempTarPath);
-          }
-        }
+        await pullAgent(slug, agent.id, config);
       }
       console.log('✅ Pull de agentes concluído!');
     } catch (error: any) {
