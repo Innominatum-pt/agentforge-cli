@@ -1035,6 +1035,18 @@ pullCmd
           const agentPath = path.join(getWorkspaceRoot(), 'agents', slug);
           await fs.ensureDir(agentPath);
 
+          // Obter os caminhos reais (com barras) da API para reverter o flattening do export
+          const docsRes = await axios.get(`${config.goclaw.api_url}/v1/agents/${agent.id}/memory/documents`, {
+            headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
+          });
+          const pathMap: Record<string, string> = {};
+          (docsRes.data || []).forEach((d: any) => {
+            if (d.path) {
+              const flat = d.path.replace(/[\/\\]/g, '_');
+              pathMap[flat] = d.path;
+            }
+          });
+
           await tar.x({
             file: tempTarPath,
             cwd: agentPath,
@@ -1048,7 +1060,10 @@ pullCmd
           if (await fs.pathExists(contextDir)) {
             const contextFiles = await fs.readdir(contextDir);
             for (const f of contextFiles) {
-              await fs.move(path.join(contextDir, f), path.join(agentPath, f), { overwrite: true });
+              const truePath = pathMap[f] ? pathMap[f] : f;
+              const targetPath = path.join(agentPath, truePath);
+              await fs.ensureDir(path.dirname(targetPath));
+              await fs.move(path.join(contextDir, f), targetPath, { overwrite: true });
             }
             await fs.remove(contextDir);
           }
