@@ -510,14 +510,18 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
         // Verifica se o ficheiro remoto existe na nossa lista de ficheiros locais
         if (!localFilePaths.includes(doc.path)) {
           console.log(`🧹 Removendo ficheiro órfão no servidor: ${doc.path}`);
-          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(doc.path)}`;
-          await axios.delete(deleteUrl, {
-            headers: {
-              Authorization: `Bearer ${config.goclaw.token}`,
-              "X-GoClaw-User-Id": config.goclaw.username || "system"
-            }
-          });
-          deletedCount++;
+          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${doc.path}`;
+          try {
+            await axios.delete(deleteUrl, {
+              headers: {
+                Authorization: `Bearer ${config.goclaw.token}`,
+                "X-GoClaw-User-Id": config.goclaw.username || "system"
+              }
+            });
+            deletedCount++;
+          } catch (delErr: any) {
+            console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
+          }
         }
       }
       if (deletedCount > 0) {
