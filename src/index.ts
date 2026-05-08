@@ -1058,6 +1058,7 @@ pullCmd
           
           const contextDir = path.join(agentPath, 'context_files');
           if (await fs.pathExists(contextDir)) {
+            const contextFiles = await fs.readdir(contextDir);
             for (const f of contextFiles) {
               if (pathMap[f]) {
                 const targetPath = path.join(agentPath, pathMap[f]);
