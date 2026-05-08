@@ -518,6 +518,22 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
 
     console.log(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
 
+    // Atualização forçada de memórias editadas (bypassa a proteção de overwrite do /import)
+    for (const localPath of localFilePaths) {
+      if (localPath.startsWith('memory/') && localPath.endsWith('.md')) {
+        try {
+          const content = await fs.readFile(path.join(sectionDir, localPath), 'utf8');
+          const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${encodeURIComponent(localPath)}`;
+          await axios.put(putUrl, { content }, {
+            headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+          });
+          console.log(`✅ Edição de memória forçada com sucesso: ${localPath}`);
+        } catch (putErr: any) {
+          console.warn(`⚠️ Aviso na edição de ${localPath}: O conteúdo pode não ter sido alterado. (${putErr.message})`);
+        }
+      }
+    }
+
     // --- Início do Pruning (Remover ficheiros órfãos do servidor) ---
     try {
       const documentsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
