@@ -442,45 +442,84 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
   }
 
   const tempExportDir = path.join(basePath, `temp_export_${slug}`);
-  const tempContextDir = path.join(tempExportDir, "context_files");
   const tarPath = path.join(basePath, `temp_export_${slug}.tar.gz`);
 
   // Guardar lista de ficheiros locais para pruning
   const localFilePaths: string[] = [];
-  async function collectFiles(dir: string, baseDir: string) {
+  async function collectFilesRecursive(dir: string, baseDir: string): Promise<string[]> {
+    const results: string[] = [];
+    if (!(await fs.pathExists(dir))) return results;
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
       if (entry.isDirectory()) {
-        await collectFiles(fullPath, baseDir);
+        const subResults = await collectFilesRecursive(fullPath, baseDir);
+        results.push(...subResults);
       } else {
-        localFilePaths.push(relativePath);
+        results.push(relativePath);
       }
     }
+    return results;
   }
 
   try {
-    await fs.ensureDir(tempContextDir);
+    const sections = new Set<string>();
+    
+    // Processar ficheiros/pastas da raiz do agente
     for (const item of itemsToSync) {
       const itemPath = path.join(agentPath, item);
-      await fs.copy(itemPath, path.join(tempContextDir, item));
+      const isDir = (await fs.stat(itemPath)).isDirectory();
+      
+      let section = "context_files";
+      if (isDir && (item === "memory" || item === "_system")) {
+        section = item;
+      }
+      
+      sections.add(section);
+      const targetDir = path.join(tempExportDir, section);
+      await fs.ensureDir(targetDir);
+      
+      if (isDir && section !== "context_files") {
+        // Se for uma pasta que é a sua própria secção (memory, _system),
+        // o conteúdo vai DIRETAMENTE para a raiz dessa secção.
+        // Ex: agents/mazikeen/memory/file.md -> tempExportDir/memory/file.md
+        const subFiles = await fs.readdir(itemPath);
+        for (const sub of subFiles) {
+          await fs.copy(path.join(itemPath, sub), path.join(targetDir, sub));
+        }
+      } else {
+        // Context files normais vão para tempExportDir/context_files/item
+        await fs.copy(itemPath, path.join(targetDir, item));
+      }
     }
-    
-    // Coletar todos os caminhos relativos para pruning futuro
-    await collectFiles(tempContextDir, tempContextDir);
+
+    // Coletar ficheiros para pruning, respeitando os prefixos originais
+    for (const section of sections) {
+      const sectionDir = path.join(tempExportDir, section);
+      const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
+      for (const entry of sectionEntries) {
+        if (section === "context_files") {
+          localFilePaths.push(entry);
+        } else {
+          localFilePaths.push(`${section}/${entry}`);
+        }
+      }
+    }
+
+    const sectionsArray = Array.from(sections);
 
     await tar.c({
       gzip: true,
       file: tarPath,
       cwd: tempExportDir
-    }, ["context_files"]);
+    }, sectionsArray);
 
     const form = new FormData();
     form.append("file", fs.createReadStream(tarPath));
 
     // Upload dos ficheiros (aditivo)
-    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=context_files`;
+    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=${sectionsArray.join(",")}`;
     await axios.post(url, form, {
       headers: {
         ...form.getHeaders(),
