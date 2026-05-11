@@ -9,6 +9,7 @@ import FormData from "form-data";
 import * as tar from "tar";
 import axios from "axios";
 import * as readline from "readline";
+import os from "os";
 
 function confirmOverwrite(entityType: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -788,92 +789,104 @@ const pullCmd = program
   .description("Sincroniza entidades do GoClaw para o workspace local");
 
 async function pullAllSkills(config: any) {
+  const workspaceRoot = getWorkspaceRoot();
+  const skillsDir = path.join(workspaceRoot, "skills");
+
   console.log("🧹 Limpando a pasta local de skills...");
-  await fs.emptyDir(path.join(getWorkspaceRoot(), "skills"));
+  await fs.emptyDir(skillsDir);
 
-  console.log("📥 Baixando skills do GoClaw...");
-  const url = `${config.goclaw.api_url}${config.goclaw.skills_export_endpoint || '/v1/skills/export'}`;
-  const response = await axios.get(url, {
-    headers: {
-      Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
-    },
-    responseType: "stream"
-  });
-
-  const tempTarPath = path.join(getWorkspaceRoot(), "temp_skills.tar.gz");
-  const writer = fs.createWriteStream(tempTarPath);
-  response.data.pipe(writer);
-
-  await new Promise((resolve, reject) => {
-    writer.on("finish", resolve);
-    writer.on("error", reject);
-  });
-
-  console.log("📦 Extraindo skills para a pasta local...");
-  await tar.x({
-    file: tempTarPath,
-    cwd: getWorkspaceRoot()
-  });
-  await fs.remove(tempTarPath);
-
-  console.log("📥 Baixando ficheiros de código das skills...");
+  console.log("📥 Obtendo lista de skills do GoClaw...");
   const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
     headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
   });
   
   const skills = skillsListRes.data.skills || [];
+  console.log(`🔍 Encontradas ${skills.length} skills no servidor.`);
+
   for (const skill of skills) {
     try {
       const isSystem = skill.is_system === true;
       const targetFolder = isSystem ? path.join("system", skill.slug) : skill.slug;
-      
-      if (isSystem) {
-        const originalPath = path.join(getWorkspaceRoot(), "skills", skill.slug);
-        const newPath = path.join(getWorkspaceRoot(), "skills", targetFolder);
-        if (await fs.pathExists(originalPath)) {
-          await fs.ensureDir(path.dirname(newPath));
-          await fs.move(originalPath, newPath, { overwrite: true });
-        }
-      }
+      const skillLocalPath = path.join(skillsDir, targetFolder);
+      await fs.ensureDir(skillLocalPath);
 
-      const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-      });
-      
-      const files = filesRes.data.files || [];
-      for (const file of files) {
-        if (file.isDir) continue;
-        const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${file.path}`, {
+      console.log(`📦 Baixando skill: ${skill.slug}...`);
+
+      // Método 1: Export individual (Muito mais robusto para Managed/Store Skills)
+      // O endpoint /v1/skills/export?slugs=... garante que recebemos o tarball completo da skill
+      try {
+        const exportUrl = `${config.goclaw.api_url}/v1/skills/export?slugs=${skill.slug}`;
+        const exportRes = await axios.get(exportUrl, {
+          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
+          responseType: 'arraybuffer'
+        });
+
+        const tempTarPath = path.join(os.tmpdir(), `af-skill-${skill.slug}-${Date.now()}.tar.gz`);
+        await fs.writeFile(tempTarPath, exportRes.data);
+
+        const tempExtractDir = path.join(os.tmpdir(), `af-extract-${skill.slug}-${Date.now()}`);
+        await fs.ensureDir(tempExtractDir);
+        
+        await tar.x({
+          file: tempTarPath,
+          cwd: tempExtractDir
+        });
+
+        // O tarball de export estruturado pelo GoClaw coloca os ficheiros em skills/{slug}/
+        const extractedSkillDir = path.join(tempExtractDir, "skills", skill.slug);
+        if (await fs.pathExists(extractedSkillDir)) {
+          await fs.copy(extractedSkillDir, skillLocalPath, { overwrite: true });
+        } else {
+          // Fallback caso a estrutura seja diferente
+          await fs.copy(tempExtractDir, skillLocalPath, { overwrite: true });
+        }
+
+        await fs.remove(tempTarPath);
+        await fs.remove(tempExtractDir);
+        
+      } catch (exportErr: any) {
+        // Método 2: Download cirúrgico de ficheiros (Fallback para Workspace mode)
+        console.warn(`⚠️ Export falhou para ${skill.slug}, tentando download direto...`);
+        
+        const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
           headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
         });
-        const filePath = path.join(getWorkspaceRoot(), "skills", targetFolder, file.path);
-        await fs.ensureDir(path.dirname(filePath));
-        await fs.writeFile(filePath, fileContentRes.data.content || "");
-      }
-    } catch (fileErr: any) {
-      console.warn(`⚠️ Não foi possível transferir os ficheiros da skill ${skill.slug}: ${fileErr.message}`);
-    }
-  }
+        
+        const files = filesRes.data.files || [];
+        if (files.length === 0) {
+          console.warn(`⚠️ A skill ${skill.slug} não parece ter ficheiros adicionais.`);
+        }
 
-  // Remover quaisquer skills fantasmas que o tarball tenha extraído
-  const validSlugs = new Set(skills.map((s: any) => s.is_system === true ? path.join("system", s.slug) : s.slug));
-  const skillsDir = path.join(getWorkspaceRoot(), "skills");
-  if (await fs.pathExists(skillsDir)) {
-    const localItems = await fs.readdir(skillsDir);
-    for (const item of localItems) {
-      if (item === "system") {
-        const systemDir = path.join(skillsDir, "system");
-        if (await fs.pathExists(systemDir)) {
-          const systemItems = await fs.readdir(systemDir);
-          for (const sysItem of systemItems) {
-            if (!validSlugs.has(path.join("system", sysItem))) {
-              await fs.remove(path.join(systemDir, sysItem));
-            }
+        for (const file of files) {
+          if (file.isDir) continue;
+          try {
+            const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${encodeURIComponent(file.path)}`, {
+              headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+            });
+            const filePath = path.join(skillLocalPath, file.path);
+            await fs.ensureDir(path.dirname(filePath));
+            await fs.writeFile(filePath, fileContentRes.data.content || "");
+          } catch (fErr: any) {
+            console.error(`  ❌ Falha no ficheiro ${file.path}: ${fErr.message}`);
           }
         }
-      } else if (!validSlugs.has(item)) {
-        await fs.remove(path.join(skillsDir, item));
       }
+
+      // Garantir metadata.json para futura sincronização
+      const metadataPath = path.join(skillLocalPath, "metadata.json");
+      if (!(await fs.pathExists(metadataPath))) {
+        await fs.writeJson(metadataPath, {
+          id: skill.id,
+          name: skill.name,
+          slug: skill.slug,
+          description: skill.description,
+          visibility: skill.visibility,
+          version: skill.version
+        }, { spaces: 2 });
+      }
+
+    } catch (err: any) {
+      console.error(`❌ Erro processando skill ${skill.slug}: ${err.message}`);
     }
   }
 }
