@@ -6,13 +6,21 @@
   "bin": {
     "agentforge": "dist/index.js"
   },
+  "files": [
+    "dist/",
+    "templates/",
+    "README.md",
+    "LICENSE*"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "test": "vitest run",
-    "verify": "npm run typecheck && npm test && npm run build"
+    "prepack": "npm run build",
+    "pack:check": "node scripts/check-package-files.mjs",
+    "verify": "npm run typecheck && npm test && npm run build && npm run pack:check"
   },
   "repository": {
     "type": "git",

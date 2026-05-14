@@ -102,3 +102,29 @@ Once configured, the `.github/workflows/publish.yml` workflow provided in this r
 - The configured instance OpenAPI at `/v1/openapi.json` should be used to confirm the installed server contract.
 - Path mapping, memory sync, `context_files`, skills import/export, pull, deploy, and pruning changes require regression tests.
 - Run `npm run verify` before opening or merging a PR.
+
+### Package Inspection
+
+Before publishing, run:
+
+```bash
+npm pack --dry-run
+```
+
+The package should contain runtime files only, mainly:
+- `package.json`
+- `README.md`
+- `dist/`
+- `templates/`
+
+It must not contain:
+- `agentforge.json`
+- `agentforge.yml`
+- `.env` files
+- `documents/`
+- `src/`
+- tests
+- `.github/`
+- `AGENTS.md`
+- local OpenAPI snapshots
+- credentials or tokens

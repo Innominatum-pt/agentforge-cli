@@ -70,6 +70,16 @@ web_modules/
 .env.*
 !.env.example
 
+# AgentForge / GoClaw local credentials
+agentforge.json
+agentforge.yml
+agentforge.local.json
+agentforge.local.yml
+documents/goclaw-openapi.json
+documents/*local*
+*.local.json
+*.local.yml
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
