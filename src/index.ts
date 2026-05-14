@@ -536,14 +536,8 @@ async function importContextArchive(
   const form = new FormData();
   form.append("file", fs.createReadStream(tarPath));
 
-  const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=${sectionsArray.join(",")}`;
-  await axios.post(url, form, {
-    headers: {
-      ...form.getHeaders(),
-      Authorization: `Bearer ${config.goclaw.token}`,
-      "X-GoClaw-User-Id": config.goclaw.username || "system"
-    }
-  });
+  const client = createGoclawClientFromConfig(config);
+  await client.importAgentArchive(agentId, form, form.getHeaders(), sectionsArray);
 
   console.log(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
 }
@@ -717,7 +711,7 @@ deployCmd
       await deployContextFiles(slug, config);
       console.log("✅ Deploy de contexto concluído!");
     } catch (error: any) {
-      console.error("❌ Erro ao enviar contexto:", error.response?.data || error.message);
+      console.error("❌ Erro ao enviar contexto:", error.responseData || error.response?.data || error.message);
     }
   });
 
