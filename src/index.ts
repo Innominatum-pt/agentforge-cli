@@ -1035,11 +1035,8 @@ pullCmd
 
     console.log("📥 Buscando lista de agentes do GoClaw...");
     try {
-      const listResponse = await axios.get(`${config.goclaw.api_url}/v1/agents`, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-      });
-      
-      const agents = listResponse.data.agents || [];
+      const client = createGoclawClientFromConfig(config);
+      const agents = await client.listAgents();
       console.log(`Encontrados ${agents.length} agentes. Sincronizando...`);
 
       for (const agent of agents) {
@@ -1049,8 +1046,8 @@ pullCmd
 
       console.log("✅ Pull de agentes concluído com sucesso!");
     } catch (error: any) {
-      if (error.response && error.response.status) {
-        console.error(`❌ Erro durante o pull dos agentes: HTTP ${error.response.status} - Verifique suas credenciais e permissões no agentforge.json (username deve ser o dono do agente).`);
+      if (error.response?.status || error.status) {
+        console.error(`❌ Erro durante o pull dos agentes: HTTP ${error.response?.status || error.status} - Verifique suas credenciais e permissões no agentforge.json (username deve ser o dono do agente).`);
       } else {
         console.error("❌ Erro durante o pull dos agentes:", error.message);
       }
@@ -1087,11 +1084,8 @@ pullCmd
     // PULL AGENTS INLINE
     console.log('\n--- [2/2] AGENTS ---');
     try {
-      const listResponse = await axios.get(`${config.goclaw.api_url}/v1/agents`, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, 'X-GoClaw-User-Id': config.goclaw.username || 'system' }
-      });
-      
-      const agents = listResponse.data.agents || [];
+      const client = createGoclawClientFromConfig(config);
+      const agents = await client.listAgents();
       console.log(`Encontrados ${agents.length} agentes. Sincronizando...`);
 
       for (const agent of agents) {
