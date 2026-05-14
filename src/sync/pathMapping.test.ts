@@ -42,6 +42,18 @@ describe("archiveNameToLocalContextFile", () => {
       "_system/foo.md"
     );
   });
+
+  it('returns "SOUL_BACKUP.md" for "SOUL_BACKUP.md"', () => {
+    expect(archiveNameToLocalContextFile("SOUL_BACKUP.md")).toBe(
+      "SOUL_BACKUP.md"
+    );
+  });
+
+  it('returns "CAPABILITIES.md" for "CAPABILITIES.md"', () => {
+    expect(archiveNameToLocalContextFile("CAPABILITIES.md")).toBe(
+      "CAPABILITIES.md"
+    );
+  });
 });
 
 describe("remoteSkillToLocalFolder", () => {

@@ -12,6 +12,16 @@ export function assertSafeRelativePath(input: string): string {
   // Normalize backslashes to POSIX-style slashes
   const normalized = input.replace(/\\/g, "/");
 
+  // Reject Windows drive-letter absolute paths (C:/...)
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    throw new Error(`Path must be relative, received absolute path: ${input}`);
+  }
+
+  // Reject UNC/network absolute paths (//server/share/...)
+  if (/^\/\//.test(normalized)) {
+    throw new Error(`Path must be relative, received absolute path: ${input}`);
+  }
+
   if (path.isAbsolute(normalized)) {
     throw new Error(`Path must be relative, received absolute path: ${input}`);
   }

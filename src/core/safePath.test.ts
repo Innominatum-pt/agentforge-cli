@@ -23,6 +23,22 @@ describe("assertSafeRelativePath", () => {
     );
   });
 
+  it("rejects Windows absolute paths with forward slashes", () => {
+    expect(() => assertSafeRelativePath("C:/temp/evil.md")).toThrow("absolute");
+  });
+
+  it("rejects UNC network absolute paths", () => {
+    expect(() => assertSafeRelativePath("\\\\server\\share\\evil.md")).toThrow(
+      "absolute"
+    );
+  });
+
+  it("rejects UNC network absolute paths with forward slashes", () => {
+    expect(() => assertSafeRelativePath("//server/share/evil.md")).toThrow(
+      "absolute"
+    );
+  });
+
   it("rejects paths containing .. segments", () => {
     expect(() => assertSafeRelativePath("../evil.md")).toThrow("traversal");
   });

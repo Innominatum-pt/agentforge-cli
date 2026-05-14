@@ -17,7 +17,7 @@ export function archiveNameToLocalContextFile(archiveName: string): string {
   if (archiveName.startsWith("_system_")) {
     return archiveName.replace("_system_", "_system/");
   }
-  return archiveName.replace(/_/g, "/");
+  return archiveName;
 }
 
 export function localSkillFolderToRemoteSlug(localPathOrSlug: string): string {
