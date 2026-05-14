@@ -932,17 +932,14 @@ pullCmd
 async function pullAgent(slug: string, agentId: string, config: any) {
   console.log(`📦 Baixando agente: ${slug}...`);
   
-  const url = `${config.goclaw.api_url}/v1/agents/${agentId}/export`;
-  const response = await axios.get(url, {
-    headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
-    responseType: "stream"
-  });
+  const client = createGoclawClientFromConfig(config);
+  const exportStream = await client.exportAgentArchive(agentId);
 
   const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
-  
+
   try {
     const writer = fs.createWriteStream(tempTarPath);
-    response.data.pipe(writer);
+    (exportStream as any).pipe(writer);
 
     await new Promise((resolve, reject) => {
       writer.on("finish", resolve);
