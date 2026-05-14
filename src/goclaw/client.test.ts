@@ -12,6 +12,7 @@ function createFakeTransport(
     url: string;
     headers?: Record<string, string>;
     data?: unknown;
+    responseType?: string;
   }) => Promise<HttpResponse<unknown>>
 ): HttpTransport {
   return {
@@ -676,5 +677,41 @@ describe("GoclawClient memory and context methods", () => {
     expect(capturedPath).toBe(
       "https://example.com/v1/agents/a1/memory/documents/memory/foo.md?user_id=user%40domain.com"
     );
+  });
+
+  it("calls GET /v1/agents/:id/export for exportAgentArchive", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedResponseType: string | undefined;
+    const transport = createFakeTransport(async ({ method, url, responseType }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedResponseType = responseType;
+      return { data: { pipe: () => {} }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.exportAgentArchive("a1");
+    expect(capturedMethod).toBe("GET");
+    expect(capturedPath).toBe("https://example.com/v1/agents/a1/export");
+    expect(capturedResponseType).toBe("stream");
+    expect(result).toEqual({ pipe: expect.any(Function) });
+  });
+
+  it("sends auth headers in exportAgentArchive", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: { pipe: () => {} }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.exportAgentArchive("a1");
+    expect(capturedHeaders?.Authorization).toBe("Bearer tok");
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("admin");
   });
 });

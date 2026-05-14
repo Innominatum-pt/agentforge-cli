@@ -244,6 +244,15 @@ export class GoclawClient {
     });
     return response.data;
   }
+
+  async exportAgentArchive(agentId: string): Promise<unknown> {
+    const response = await this.request<unknown>({
+      method: "GET",
+      path: `/v1/agents/${agentId}/export`,
+      responseType: "stream",
+    });
+    return response.data;
+  }
 }
 
 export function createGoclawClientFromConfig(config: any): GoclawClient {

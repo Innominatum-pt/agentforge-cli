@@ -34,3 +34,10 @@
 - Therefore, full pull/export and incremental memory sync must be treated as separate mechanisms.
 - Decision: PR #10 only separates deployContextFiles() internals. It does not change pull behaviour and does not replace export/import with memory GET endpoints.
 - Future work should validate whether pull memory reconstruction should use export JSONL, memory document GET, or a hybrid approach.
+
+### 2026-05-14 — Agent export client method added without runtime migration
+
+- PR #17 adds client methods for the existing agent export/archive endpoint used by pullAgent().
+- Runtime pullAgent() is intentionally unchanged.
+- Export/archive pull remains separate from memory document CRUD.
+- Future migration must preserve archive responseType and local reconstruction semantics.
