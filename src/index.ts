@@ -809,11 +809,8 @@ async function pullAllSkills(config: any) {
   await fs.emptyDir(skillsDir);
 
   console.log("📥 Obtendo lista de skills do GoClaw...");
-  const skillsListRes = await axios.get(`${config.goclaw.api_url}/v1/skills`, {
-    headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-  });
-  
-  const skills = skillsListRes.data.skills || [];
+  const client = createGoclawClientFromConfig(config);
+  const skills = await client.listSkills();
   console.log(`🔍 Encontradas ${skills.length} skills no servidor.`);
 
   for (const skill of skills) {
@@ -924,10 +921,10 @@ pullCmd
       console.log("✅ Pull de skills concluído com sucesso! As skills foram atualizadas localmente.");
     } catch (error: any) {
       console.error("❌ Erro durante o pull das skills:");
-      if (error.response) {
-        console.error(`Status HTTP ${error.response.status}`);
+      if (error.response?.status || error.status) {
+        console.error(`Status HTTP ${error.response?.status || error.status}`);
       } else {
-        console.error(error.message);
+        console.error(error.responseData || error.response?.data || error.message);
       }
     }
   });
