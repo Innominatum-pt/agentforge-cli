@@ -94,8 +94,8 @@ export class GoclawClient {
         ...options,
         url: this.buildUrl(options.path),
         headers: {
-          ...this.getAuthHeaders(),
           ...options.extraHeaders,
+          ...this.getAuthHeaders(),
         },
       });
     } catch (error: any) {
