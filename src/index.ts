@@ -494,11 +494,8 @@ async function injectGhostPlaceholders(
   localFilePaths: string[]
 ): Promise<void> {
   try {
-    const docsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
-    const preDocsRes = await axios.get(docsUrl, {
-      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-    });
-    const preDocs = preDocsRes.data || [];
+    const client = createGoclawClientFromConfig(config);
+    const preDocs = await client.listMemoryDocuments(agentId);
     for (const pDoc of preDocs) {
       if (pDoc.path && !localFilePaths.includes(pDoc.path)) {
         const flatGhost = pDoc.path.replace(/[\/\\]/g, '_');
