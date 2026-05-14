@@ -646,27 +646,27 @@ async function deployAgent(slug: string, config: any) {
 
   const agentConfig = await fs.readJson(agentJsonPath);
   console.log(`🚀 Sincronizando agente "${slug}"...`);
-  
+
   try {
+    const client = createGoclawClientFromConfig(config);
     const agentId = await resolveAgentId(slug, config);
     const exists = agentId !== null;
 
     if (!exists) {
-       await axios.post(`${config.goclaw.api_url}/v1/agents`, agentConfig, {
-         headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-       });
-       console.log(`✅ Agente "${slug}" criado.`);
+      await client.createAgent(agentConfig);
+      console.log(`✅ Agente "${slug}" criado.`);
     } else {
-       await axios.put(`${config.goclaw.api_url}/v1/agents/${agentId}`, agentConfig, {
-         headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-       });
-       console.log(`✅ Configuração de "${slug}" atualizada.`);
+      await client.updateAgent(agentId, agentConfig);
+      console.log(`✅ Configuração de "${slug}" atualizada.`);
     }
 
     await deployContextFiles(slug, config, agentId);
     console.log(`✅ Agente "${slug}" sincronizado com sucesso!`);
   } catch (error: any) {
-    console.error(`❌ Erro no deploy de "${slug}":`, error.response?.data || error.message);
+    console.error(
+      `❌ Erro no deploy de "${slug}":`,
+      error.responseData || error.response?.data || error.message
+    );
   }
 }
 
