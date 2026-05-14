@@ -29,6 +29,16 @@ export interface GrantSkillToAgentPayload {
   version?: string | null;
 }
 
+export interface GoclawMemoryDocument {
+  path?: string;
+  user_id?: string;
+  [key: string]: unknown;
+}
+
+export interface UpdateMemoryDocumentPayload {
+  content: string;
+}
+
 export interface HttpResponse<T> {
   data: T;
   status: number;

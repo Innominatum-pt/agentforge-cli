@@ -383,3 +383,298 @@ describe("GoclawClient skill methods", () => {
     expect(capturedHeaders?.["content-type"]).toBe("multipart/form-data; boundary=abc");
   });
 });
+
+describe("GoclawClient memory and context methods", () => {
+  it("calls GET /v1/agents/:id/memory/documents for listMemoryDocuments", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ method, url }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      return {
+        data: [{ path: "memory/foo.md", user_id: "u1" }],
+        status: 200,
+        statusText: "OK",
+      };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const docs = await client.listMemoryDocuments("a1");
+    expect(capturedMethod).toBe("GET");
+    expect(capturedPath).toBe("https://example.com/v1/agents/a1/memory/documents");
+    expect(docs).toEqual([{ path: "memory/foo.md", user_id: "u1" }]);
+  });
+
+  it("appends user_id query param for listMemoryDocuments with userId", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: [{ path: "memory/foo.md" }], status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.listMemoryDocuments("a1", { userId: "u1" });
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents?user_id=u1"
+    );
+  });
+
+  it("sends requestUserId as X-GoClaw-User-Id in listMemoryDocuments", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: [{ path: "memory/foo.md" }], status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.listMemoryDocuments("a1", { requestUserId: "owner1" });
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("owner1");
+  });
+
+  it("returns empty array when listMemoryDocuments response is not an array", async () => {
+    const transport = createFakeTransport(async () => ({
+      data: null,
+      status: 200,
+      statusText: "OK",
+    }));
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const docs = await client.listMemoryDocuments("a1");
+    expect(docs).toEqual([]);
+  });
+
+  it("calls POST /v1/agents/:id/import for importAgentArchive", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedData: unknown;
+    const transport = createFakeTransport(async ({ method, url, data }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedData = data;
+      return { data: { imported: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.importAgentArchive(
+      "a1",
+      { fake: "form" },
+      { "content-type": "multipart/form-data; boundary=abc" },
+      ["context_files", "agents"]
+    );
+    expect(capturedMethod).toBe("POST");
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/import?include=context_files,agents"
+    );
+    expect(capturedData).toEqual({ fake: "form" });
+    expect(result).toEqual({ imported: true });
+  });
+
+  it("does not allow form headers to override auth headers in importAgentArchive", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: { imported: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "real-token", username: "system-user" },
+      transport
+    );
+    await client.importAgentArchive(
+      "a1",
+      { fake: "form" },
+      {
+        "content-type": "multipart/form-data; boundary=abc",
+        Authorization: "Bearer attacker",
+        "X-GoClaw-User-Id": "attacker-user",
+      },
+      ["context_files"]
+    );
+    expect(capturedHeaders?.Authorization).toBe("Bearer real-token");
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("system-user");
+    expect(capturedHeaders?.["content-type"]).toBe("multipart/form-data; boundary=abc");
+  });
+
+  it("calls PUT /v1/agents/:id/memory/documents/:path for updateMemoryDocument", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedData: unknown;
+    const transport = createFakeTransport(async ({ method, url, data }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedData = data;
+      return { data: { updated: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.updateMemoryDocument("a1", "memory/foo.md", {
+      content: "hello",
+    });
+    expect(capturedMethod).toBe("PUT");
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/foo.md"
+    );
+    expect(capturedData).toEqual({ content: "hello" });
+    expect(result).toEqual({ updated: true });
+  });
+
+  it("appends user_id query param for updateMemoryDocument with userId", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: { updated: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.updateMemoryDocument("a1", "memory/foo.md", { content: "hello" }, { userId: "u1" });
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/foo.md?user_id=u1"
+    );
+  });
+
+  it("does not URL-encode slashes in updateMemoryDocument path", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: { updated: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.updateMemoryDocument("a1", "memory/nested/bar.md", {
+      content: "hello",
+    });
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/nested/bar.md"
+    );
+  });
+
+  it("calls DELETE /v1/agents/:id/memory/documents/:path for deleteMemoryDocument", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ method, url }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.deleteMemoryDocument("a1", "memory/foo.md");
+    expect(capturedMethod).toBe("DELETE");
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/foo.md"
+    );
+    expect(result).toEqual({ deleted: true });
+  });
+
+  it("appends user_id query param for deleteMemoryDocument with userId", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.deleteMemoryDocument("a1", "memory/foo.md", { userId: "u1" });
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/foo.md?user_id=u1"
+    );
+  });
+
+  it("sends requestUserId as X-GoClaw-User-Id in deleteMemoryDocument", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.deleteMemoryDocument("a1", "memory/foo.md", { requestUserId: "doc-owner" });
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("doc-owner");
+  });
+
+  it("uses both userId query and requestUserId header in deleteMemoryDocument", async () => {
+    let capturedPath = "";
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ url, headers }) => {
+      capturedPath = url;
+      capturedHeaders = headers;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.deleteMemoryDocument("a1", "memory/foo.md", { userId: "u1", requestUserId: "doc-owner" });
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/foo.md?user_id=u1"
+    );
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("doc-owner");
+  });
+
+  it("does not URL-encode slashes in deleteMemoryDocument path", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.deleteMemoryDocument("a1", "memory/nested/bar.md");
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/nested/bar.md"
+    );
+  });
+
+  it("uses configured username for deleteMemoryDocument when userId is omitted", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.deleteMemoryDocument("a1", "memory/foo.md");
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("admin");
+  });
+
+  it("URL-encodes query user_id in deleteMemoryDocument", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: { deleted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.deleteMemoryDocument("a1", "memory/foo.md", { userId: "user@domain.com" });
+    expect(capturedPath).toBe(
+      "https://example.com/v1/agents/a1/memory/documents/memory/foo.md?user_id=user%40domain.com"
+    );
+  });
+});
