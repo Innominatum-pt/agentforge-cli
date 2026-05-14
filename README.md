@@ -91,3 +91,14 @@ To fully automate your CI/CD pipeline securely without using any hardcoded NPM t
 5. Click **Add Publisher**.
 
 Once configured, the `.github/workflows/publish.yml` workflow provided in this repository will automatically securely authenticate via OIDC and publish your package whenever you create a new GitHub Release.
+
+---
+
+## Development Guardrails
+
+- Coding agents must read `AGENTS.md` before changing the repository.
+- GoClaw integration work must be documentation-first.
+- The canonical LLM documentation source is `https://docs.goclaw.sh/llms-full.txt`.
+- The configured instance OpenAPI at `/v1/openapi.json` should be used to confirm the installed server contract.
+- Path mapping, memory sync, `context_files`, skills import/export, pull, deploy, and pruning changes require regression tests.
+- Run `npm run verify` before opening or merging a PR.

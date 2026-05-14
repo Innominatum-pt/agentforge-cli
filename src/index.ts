@@ -10,6 +10,7 @@ import * as tar from "tar";
 import axios from "axios";
 import * as readline from "readline";
 import os from "os";
+import pkg from "../package.json";
 
 function confirmOverwrite(entityType: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -46,7 +47,7 @@ const program = new Command();
 program
   .name("agentforge")
   .description("CLI para gerir agentes, equipas e templates de agentes")
-  .version("0.1.0");
+  .version(pkg.version);
 
 program
   .command("init")
