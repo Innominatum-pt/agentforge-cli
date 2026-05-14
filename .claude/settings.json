@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run verify)",
+      "Bash(npm test)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run build)",
+      "Bash(npm pack --dry-run)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh run list *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./agentforge.json)",
+      "Read(./agentforge.yml)",
+      "Read(./agentforge.local.json)",
+      "Read(./agentforge.local.yml)",
+      "Read(./documents/goclaw-openapi.json)",
+      "Read(./secrets/**)",
+      "Bash(npm publish *)",
+      "Bash(git push origin main)",
+      "Bash(git push --force origin main)"
+    ]
+  }
+}
