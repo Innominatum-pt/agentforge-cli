@@ -414,6 +414,225 @@ deployCmd
     await deploySkill(slug, config, basePath);
   });
 
+type ContextSyncBuildResult = {
+  sectionDir: string;
+  sectionsArray: string[];
+  localFilePaths: string[];
+};
+
+async function collectFilesRecursive(dir: string, baseDir: string): Promise<string[]> {
+  const results: string[] = [];
+  if (!(await fs.pathExists(dir))) return results;
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+    if (entry.isDirectory()) {
+      const subResults = await collectFilesRecursive(fullPath, baseDir);
+      results.push(...subResults);
+    } else {
+      results.push(relativePath);
+    }
+  }
+  return results;
+}
+
+async function prepareContextFilesExport(
+  slug: string,
+  agentPath: string,
+  tempExportDir: string,
+  tarPath: string,
+  itemsToSync: string[]
+): Promise<ContextSyncBuildResult> {
+  const sectionDir = path.join(tempExportDir, "context_files");
+  const sections = new Set<string>();
+  const localFilePaths: string[] = [];
+
+  for (const item of itemsToSync) {
+    const itemPath = path.join(agentPath, item);
+    const isDir = (await fs.stat(itemPath)).isDirectory();
+    const section = "context_files";
+    sections.add(section);
+    const targetDir = path.join(tempExportDir, section);
+    await fs.ensureDir(targetDir);
+
+    if (isDir) {
+      const subFiles = await fs.readdir(itemPath);
+      for (const sub of subFiles) {
+        const subPath = path.join(itemPath, sub);
+        const isSubDir = (await fs.stat(subPath)).isDirectory();
+        if (!isSubDir) {
+          const flatName = `${item}_${sub}`;
+          await fs.copy(subPath, path.join(targetDir, flatName));
+        }
+      }
+    } else {
+      await fs.copy(itemPath, path.join(targetDir, item));
+    }
+  }
+
+  const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
+  for (const entry of sectionEntries) {
+    let finalEntry = entry;
+    if (entry.startsWith("memory_")) {
+      finalEntry = entry.replace("memory_", "memory/");
+    } else if (entry.startsWith("_system_")) {
+      finalEntry = entry.replace("_system_", "_system/");
+    }
+    localFilePaths.push(finalEntry);
+  }
+
+  const sectionsArray = Array.from(sections);
+  return { sectionDir, sectionsArray, localFilePaths };
+}
+
+async function injectGhostPlaceholders(
+  agentId: string,
+  config: any,
+  tempExportDir: string,
+  sectionsArray: string[],
+  localFilePaths: string[]
+): Promise<void> {
+  try {
+    const docsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
+    const preDocsRes = await axios.get(docsUrl, {
+      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+    });
+    const preDocs = preDocsRes.data || [];
+    for (const pDoc of preDocs) {
+      if (pDoc.path && !localFilePaths.includes(pDoc.path)) {
+        const flatGhost = pDoc.path.replace(/[\/\\]/g, '_');
+        const ghostPath = path.join(tempExportDir, "context_files", flatGhost);
+        await fs.ensureDir(path.dirname(ghostPath));
+        await fs.writeFile(ghostPath, " ");
+        if (!sectionsArray.includes("context_files")) {
+          sectionsArray.push("context_files");
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn("Aviso: Falha ao procurar fantasmas para o tarball.", e.message);
+  }
+}
+
+async function createContextTarball(
+  tempExportDir: string,
+  tarPath: string,
+  sectionsArray: string[]
+): Promise<void> {
+  await tar.c({
+    gzip: true,
+    file: tarPath,
+    cwd: tempExportDir
+  }, sectionsArray);
+}
+
+async function importContextArchive(
+  agentId: string,
+  config: any,
+  tarPath: string,
+  sectionsArray: string[]
+): Promise<void> {
+  const form = new FormData();
+  form.append("file", fs.createReadStream(tarPath));
+
+  const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=${sectionsArray.join(",")}`;
+  await axios.post(url, form, {
+    headers: {
+      ...form.getHeaders(),
+      Authorization: `Bearer ${config.goclaw.token}`,
+      "X-GoClaw-User-Id": config.goclaw.username || "system"
+    }
+  });
+
+  console.log(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
+}
+
+async function forceUpdateLocalMemoryDocuments(
+  agentId: string,
+  config: any,
+  localFilePaths: string[],
+  sectionDir: string
+): Promise<void> {
+  // Memory document paths are GoClaw catch-all paths.
+  // Slashes must remain unencoded. Paths must be relative, e.g. memory/foo.md.
+  for (const localPath of localFilePaths) {
+    if (localPath.startsWith('memory/') && localPath.endsWith('.md')) {
+      try {
+        const flatFileName = localPath.replace("memory/", "memory_");
+        const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
+        const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${localPath}`;
+        await axios.put(putUrl, { content }, {
+          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
+        });
+        console.log(`✅ Edição de memória forçada com sucesso: ${localPath}`);
+      } catch (putErr: any) {
+        console.warn(`⚠️ Aviso na edição de ${localPath}: O conteúdo pode não ter sido alterado. (${putErr.message})`);
+      }
+    }
+  }
+}
+
+async function pruneOrphanMemoryDocuments(
+  agentId: string,
+  config: any,
+  localFilePaths: string[]
+): Promise<void> {
+  // Memory document paths are GoClaw catch-all paths.
+  // Slashes must remain unencoded. Paths must be relative, e.g. memory/foo.md.
+  try {
+    const documentsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
+    const docsResponse = await axios.get(documentsUrl, {
+      headers: {
+        Authorization: `Bearer ${config.goclaw.token}`,
+        "X-GoClaw-User-Id": config.goclaw.username || "system"
+      }
+    });
+
+    const remoteDocs = docsResponse.data || [];
+    let deletedCount = 0;
+
+    for (const doc of remoteDocs) {
+      if (!doc.path) continue;
+
+      if (!localFilePaths.includes(doc.path)) {
+        console.log(`🧹 Removendo memória órfã no servidor: ${doc.path}`);
+
+        try {
+          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${doc.path}`;
+          await axios.delete(deleteUrl, {
+            headers: {
+              Authorization: `Bearer ${config.goclaw.token}`,
+              "X-GoClaw-User-Id": doc.user_id || config.goclaw.username || "system"
+            }
+          });
+          deletedCount++;
+        } catch (delErr: any) {
+          const errorData = delErr.response?.data?.error || "";
+          if (delErr.response?.status === 500 && errorData.includes("not found")) {
+            console.log(`✅ ${doc.path} já estava removido da base de dados.`);
+          } else {
+            console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
+          }
+        }
+      }
+    }
+    if (deletedCount > 0) {
+      console.log(`✅ Pruning concluído: ${deletedCount} ficheiro(s) apagado(s) do GoClaw.`);
+    }
+  } catch (pruneErr: any) {
+    console.warn(`⚠️ Aviso: Falha ao fazer pruning das memórias: ${pruneErr.message}`);
+  }
+}
+
+async function cleanupContextSyncTempFiles(
+  tempExportDir: string,
+  tarPath: string
+): Promise<void> {
+  if (await fs.pathExists(tempExportDir)) await fs.remove(tempExportDir);
+  if (await fs.pathExists(tarPath)) await fs.remove(tarPath);
+}
+
 async function deployContextFiles(slug: string, config: any, resolvedId?: string | null) {
   const agentId = resolvedId || (await resolveAgentId(slug, config)) || slug;
   const basePath = getWorkspaceRoot();
@@ -433,192 +652,17 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
   const tempExportDir = path.join(basePath, `temp_export_${slug}`);
   const tarPath = path.join(basePath, `temp_export_${slug}.tar.gz`);
 
-  // Guardar lista de ficheiros locais para pruning
-  const localFilePaths: string[] = [];
-  async function collectFilesRecursive(dir: string, baseDir: string): Promise<string[]> {
-    const results: string[] = [];
-    if (!(await fs.pathExists(dir))) return results;
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
-      if (entry.isDirectory()) {
-        const subResults = await collectFilesRecursive(fullPath, baseDir);
-        results.push(...subResults);
-      } else {
-        results.push(relativePath);
-      }
-    }
-    return results;
-  }
-
   try {
-    const sections = new Set<string>();
-    
-    // Processar ficheiros/pastas da raiz do agente
-    for (const item of itemsToSync) {
-      const itemPath = path.join(agentPath, item);
-      const isDir = (await fs.stat(itemPath)).isDirectory();
-      
-      const section = "context_files";
-      sections.add(section);
-      
-      const targetDir = path.join(tempExportDir, section);
-      await fs.ensureDir(targetDir);
-      
-      if (isDir) {
-        // Obter todos os ficheiros da pasta (ex: memory, _system)
-        // e achatá-os (flatten) com o nome da pasta como prefixo (ex: memory_arquivo.md)
-        // O GoClaw espera que os ficheiros de contexto não tenham pastas, mas sim prefixos achatados!
-        const subFiles = await fs.readdir(itemPath);
-        for (const sub of subFiles) {
-          const subPath = path.join(itemPath, sub);
-          const isSubDir = (await fs.stat(subPath)).isDirectory();
-          if (!isSubDir) {
-            const flatName = `${item}_${sub}`;
-            await fs.copy(subPath, path.join(targetDir, flatName));
-          }
-        }
-      } else {
-        await fs.copy(itemPath, path.join(targetDir, item));
-      }
-    }
+    const { sectionDir, sectionsArray, localFilePaths } =
+      await prepareContextFilesExport(slug, agentPath, tempExportDir, tarPath, itemsToSync);
 
-    // Coletar ficheiros para pruning
-    const sectionDir = path.join(tempExportDir, "context_files");
-    const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
-    for (const entry of sectionEntries) {
-      // O GoClaw retorna os caminhos das memórias com barras (memory/arquivo.md)
-      // Nós achatamos para o upload (memory_arquivo.md). Para o pruning não apagar ficheiros
-      // válidos acidentalmente, temos que re-mapear o nome achatado para a versão com barra.
-      let finalEntry = entry;
-      if (entry.startsWith("memory_")) {
-        finalEntry = entry.replace("memory_", "memory/");
-      } else if (entry.startsWith("_system_")) {
-        finalEntry = entry.replace("_system_", "_system/");
-      }
-      localFilePaths.push(finalEntry);
-    }
-
-    const sectionsArray = Array.from(sections);
-
-    // --- HACK PARA APAGAR FICHEIROS FÍSICOS DO GOCLAW ---
-    // O GoClaw não apaga ficheiros do disco (context_files) quando os apagamos da DB (memory_documents).
-    // Isto faz com que os ficheiros voltem como "fantasmas" durante o pull.
-    // Solução: Injetar ficheiros vazios no tarball para os órfãos, forçando o /import a esmagá-los com 0 bytes!
-    try {
-      const docsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
-      const preDocsRes = await axios.get(docsUrl, {
-        headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-      });
-      const preDocs = preDocsRes.data || [];
-      for (const pDoc of preDocs) {
-        if (pDoc.path && !localFilePaths.includes(pDoc.path)) {
-          const flatGhost = pDoc.path.replace(/[\/\\]/g, '_');
-          const ghostPath = path.join(tempExportDir, "context_files", flatGhost);
-          await fs.ensureDir(path.dirname(ghostPath));
-          await fs.writeFile(ghostPath, " "); // 1 byte soft-delete payload
-          if (!sectionsArray.includes("context_files")) {
-            sectionsArray.push("context_files");
-          }
-        }
-      }
-    } catch (e: any) {
-      console.warn("Aviso: Falha ao procurar fantasmas para o tarball.", e.message);
-    }
-
-    await tar.c({
-      gzip: true,
-      file: tarPath,
-      cwd: tempExportDir
-    }, sectionsArray);
-
-    const form = new FormData();
-    form.append("file", fs.createReadStream(tarPath));
-
-    // Upload dos ficheiros (aditivo)
-    const url = `${config.goclaw.api_url}/v1/agents/${agentId}/import?include=${sectionsArray.join(",")}`;
-    await axios.post(url, form, {
-      headers: {
-        ...form.getHeaders(),
-        Authorization: `Bearer ${config.goclaw.token}`,
-        "X-GoClaw-User-Id": config.goclaw.username || "system"
-      }
-    });
-
-    console.log(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
-
-    // Atualização forçada de memórias editadas (bypassa a proteção de overwrite do /import)
-    for (const localPath of localFilePaths) {
-      if (localPath.startsWith('memory/') && localPath.endsWith('.md')) {
-        try {
-          // O ficheiro físico no tempExportDir está achatado (memory_arquivo.md)
-          const flatFileName = localPath.replace("memory/", "memory_");
-          const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
-          
-          // O endpoint usa {path...} portanto não podemos fazer URL encode das barras
-          const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${localPath}`;
-          await axios.put(putUrl, { content }, {
-            headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-          });
-          console.log(`✅ Edição de memória forçada com sucesso: ${localPath}`);
-        } catch (putErr: any) {
-          console.warn(`⚠️ Aviso na edição de ${localPath}: O conteúdo pode não ter sido alterado. (${putErr.message})`);
-        }
-      }
-    }
-
-    // --- Início do Pruning (Remover ficheiros órfãos do servidor) ---
-    try {
-      const documentsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
-      const docsResponse = await axios.get(documentsUrl, {
-        headers: {
-          Authorization: `Bearer ${config.goclaw.token}`,
-          "X-GoClaw-User-Id": config.goclaw.username || "system"
-        }
-      });
-      
-      const remoteDocs = docsResponse.data || [];
-      let deletedCount = 0;
-      
-      for (const doc of remoteDocs) {
-        if (!doc.path) continue;
-        
-        // Verifica se o ficheiro remoto existe na nossa lista de ficheiros locais
-        if (!localFilePaths.includes(doc.path)) {
-          console.log(`🧹 Removendo memória órfã no servidor: ${doc.path}`);
-          
-          try {
-            // O endpoint do GoClaw espera o caminho exato sem URL encode (route genérica {path...})
-            // E é mandatório passar o user_id dono do documento, senão dá erro 500.
-            const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${doc.path}`;
-            await axios.delete(deleteUrl, {
-              headers: {
-                Authorization: `Bearer ${config.goclaw.token}`,
-                "X-GoClaw-User-Id": doc.user_id || config.goclaw.username || "system"
-              }
-            });
-            deletedCount++;
-          } catch (delErr: any) {
-            const errorData = delErr.response?.data?.error || "";
-            if (delErr.response?.status === 500 && errorData.includes("not found")) {
-              console.log(`✅ ${doc.path} já estava removido da base de dados.`);
-            } else {
-              console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
-            }
-          }
-        }
-      }
-      if (deletedCount > 0) {
-        console.log(`✅ Pruning concluído: ${deletedCount} ficheiro(s) apagado(s) do GoClaw.`);
-      }
-    } catch (pruneErr: any) {
-      console.warn(`⚠️ Aviso: Falha ao fazer pruning das memórias: ${pruneErr.message}`);
-    }
-
+    await injectGhostPlaceholders(agentId, config, tempExportDir, sectionsArray, localFilePaths);
+    await createContextTarball(tempExportDir, tarPath, sectionsArray);
+    await importContextArchive(agentId, config, tarPath, sectionsArray);
+    await forceUpdateLocalMemoryDocuments(agentId, config, localFilePaths, sectionDir);
+    await pruneOrphanMemoryDocuments(agentId, config, localFilePaths);
   } finally {
-    if (await fs.pathExists(tempExportDir)) await fs.remove(tempExportDir);
-    if (await fs.pathExists(tarPath)) await fs.remove(tarPath);
+    await cleanupContextSyncTempFiles(tempExportDir, tarPath);
   }
 }
 
