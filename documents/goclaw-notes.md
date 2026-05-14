@@ -25,3 +25,12 @@
 - Existing AgentForge runtime found that deletion of orphan memory documents required using the original document owner `user_id` as `X-GoClaw-User-Id`.
 - Decision: PR #9 adds client methods supporting both documented `user_id` query scoping and request user header override, but does not migrate deployContextFiles() yet.
 - Future migration must preserve current working deletion semantics until validated against the running GoClaw OpenAPI/runtime.
+
+### 2026-05-14 — Pull/export format is not equivalent to memory document CRUD
+
+- Agent export/import uses a tar.gz archive with sections.
+- Exported memory is represented as JSONL files such as `memory/global.jsonl` and `memory/users/{user_id}.jsonl`.
+- Memory document CRUD exposes document paths through `/memory/documents/{path...}`.
+- Therefore, full pull/export and incremental memory sync must be treated as separate mechanisms.
+- Decision: PR #10 only separates deployContextFiles() internals. It does not change pull behaviour and does not replace export/import with memory GET endpoints.
+- Future work should validate whether pull memory reconstruction should use export JSONL, memory document GET, or a hybrid approach.
