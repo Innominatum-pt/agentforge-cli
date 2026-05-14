@@ -6,6 +6,8 @@ import {
   GoclawSkill,
   GoclawListSkillsResponse,
   GrantSkillToAgentPayload,
+  GoclawMemoryDocument,
+  UpdateMemoryDocumentPayload,
   HttpResponse,
   HttpTransport,
 } from "./types";
@@ -71,10 +73,10 @@ export class GoclawClient {
     this.transport = transport || new AxiosTransport();
   }
 
-  getAuthHeaders(): Record<string, string> {
+  getAuthHeaders(requestUserId?: string): Record<string, string> {
     return {
       Authorization: `Bearer ${this.config.token}`,
-      "X-GoClaw-User-Id": this.config.username || "system",
+      "X-GoClaw-User-Id": requestUserId || this.config.username || "system",
     };
   }
 
@@ -88,6 +90,7 @@ export class GoclawClient {
     data?: unknown;
     responseType?: "json" | "stream" | "arraybuffer";
     extraHeaders?: Record<string, string>;
+    requestUserId?: string;
   }): Promise<HttpResponse<T>> {
     try {
       return await this.transport.request<T>({
@@ -95,7 +98,7 @@ export class GoclawClient {
         url: this.buildUrl(options.path),
         headers: {
           ...options.extraHeaders,
-          ...this.getAuthHeaders(),
+          ...this.getAuthHeaders(options.requestUserId),
         },
       });
     } catch (error: any) {
@@ -173,6 +176,71 @@ export class GoclawClient {
       path: "/v1/skills/upload",
       data: formData,
       extraHeaders: formHeaders,
+    });
+    return response.data;
+  }
+
+  async listMemoryDocuments(
+    agentId: string,
+    options?: { userId?: string; requestUserId?: string }
+  ): Promise<GoclawMemoryDocument[]> {
+    const query = options?.userId
+      ? `?user_id=${encodeURIComponent(options.userId)}`
+      : "";
+    const response = await this.request<GoclawMemoryDocument[]>({
+      method: "GET",
+      path: `/v1/agents/${agentId}/memory/documents${query}`,
+      requestUserId: options?.requestUserId,
+    });
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
+  async importAgentArchive(
+    agentId: string,
+    formData: unknown,
+    formHeaders: Record<string, string>,
+    includeSections: string[]
+  ): Promise<unknown> {
+    const query = includeSections.join(",");
+    const response = await this.request<unknown>({
+      method: "POST",
+      path: `/v1/agents/${agentId}/import?include=${query}`,
+      data: formData,
+      extraHeaders: formHeaders,
+    });
+    return response.data;
+  }
+
+  async updateMemoryDocument(
+    agentId: string,
+    documentPath: string,
+    payload: UpdateMemoryDocumentPayload,
+    options?: { userId?: string; requestUserId?: string }
+  ): Promise<unknown> {
+    const query = options?.userId
+      ? `?user_id=${encodeURIComponent(options.userId)}`
+      : "";
+    const response = await this.request<unknown>({
+      method: "PUT",
+      path: `/v1/agents/${agentId}/memory/documents/${documentPath}${query}`,
+      data: payload,
+      requestUserId: options?.requestUserId,
+    });
+    return response.data;
+  }
+
+  async deleteMemoryDocument(
+    agentId: string,
+    documentPath: string,
+    options?: { userId?: string; requestUserId?: string }
+  ): Promise<unknown> {
+    const query = options?.userId
+      ? `?user_id=${encodeURIComponent(options.userId)}`
+      : "";
+    const response = await this.request<unknown>({
+      method: "DELETE",
+      path: `/v1/agents/${agentId}/memory/documents/${documentPath}${query}`,
+      requestUserId: options?.requestUserId,
     });
     return response.data;
   }
