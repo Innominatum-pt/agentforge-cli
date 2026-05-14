@@ -714,4 +714,109 @@ describe("GoclawClient memory and context methods", () => {
     expect(capturedHeaders?.Authorization).toBe("Bearer tok");
     expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("admin");
   });
+
+  it("calls GET /v1/skills/export with arraybuffer for exportSkillArchive", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedResponseType: string | undefined;
+    const transport = createFakeTransport(async ({ method, url, responseType }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedResponseType = responseType;
+      return { data: Buffer.from("tar"), status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.exportSkillArchive("my-skill");
+    expect(capturedMethod).toBe("GET");
+    expect(capturedPath).toBe("https://example.com/v1/skills/export?slugs=my-skill");
+    expect(capturedResponseType).toBe("arraybuffer");
+    expect(result).toEqual(Buffer.from("tar"));
+  });
+
+  it("sends auth headers in exportSkillArchive", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: Buffer.from("tar"), status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.exportSkillArchive("my-skill");
+    expect(capturedHeaders?.Authorization).toBe("Bearer tok");
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("admin");
+  });
+
+  it("calls GET /v1/skills/:id/files for listSkillFiles", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ method, url }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      return {
+        data: { files: [{ path: "SKILL.md", isDir: false }] },
+        status: 200,
+        statusText: "OK",
+      };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const files = await client.listSkillFiles("s1");
+    expect(capturedMethod).toBe("GET");
+    expect(capturedPath).toBe("https://example.com/v1/skills/s1/files");
+    expect(files).toEqual([{ path: "SKILL.md", isDir: false }]);
+  });
+
+  it("returns empty array when files field is missing in listSkillFiles", async () => {
+    const transport = createFakeTransport(async () => ({
+      data: {},
+      status: 200,
+      statusText: "OK",
+    }));
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const files = await client.listSkillFiles("s1");
+    expect(files).toEqual([]);
+  });
+
+  it("calls GET /v1/skills/:id/files/:path with encoded path for getSkillFileContent", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return {
+        data: { content: "hello" },
+        status: 200,
+        statusText: "OK",
+      };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.getSkillFileContent("s1", "path/to/file.md");
+    expect(capturedPath).toBe("https://example.com/v1/skills/s1/files/path%2Fto%2Ffile.md");
+    expect(result).toEqual({ content: "hello" });
+  });
+
+  it("preserves encoded skill file paths unlike memory document paths", async () => {
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ url }) => {
+      capturedPath = url;
+      return { data: { content: "" }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.getSkillFileContent("s1", "docs/guide.md");
+    expect(capturedPath).toBe("https://example.com/v1/skills/s1/files/docs%2Fguide.md");
+  });
 });
