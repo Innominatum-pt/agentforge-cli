@@ -336,21 +336,13 @@ async function deploySkill(slug: string, config: any, basePath: string) {
   form.append("file", fs.createReadStream(zipPath));
 
   try {
-    const url = `${config.goclaw.api_url}/v1/skills/upload`;
-    const response = await axios.post(url, form, {
-      headers: {
-        ...form.getHeaders(),
-        Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system"
-      }
-    });
-    const data = response.data;
+    const client = createGoclawClientFromConfig(config);
+    const data = (await client.uploadSkillArchive(form, form.getHeaders())) as any;
     if (data && data.version) {
       console.log(`✅ Arquivos da skill "${slug}" atualizados (versão ${data.version}).`);
     } else {
       console.log(`✅ Arquivos da skill "${slug}" atualizados.`);
     }
-
-    const client = createGoclawClientFromConfig(config);
 
     // Sincronizar metadados (visibility, description, tags, etc)
     const skills = await client.listSkills();

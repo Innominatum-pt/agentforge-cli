@@ -87,12 +87,16 @@ export class GoclawClient {
     path: string;
     data?: unknown;
     responseType?: "json" | "stream" | "arraybuffer";
+    extraHeaders?: Record<string, string>;
   }): Promise<HttpResponse<T>> {
     try {
       return await this.transport.request<T>({
         ...options,
         url: this.buildUrl(options.path),
-        headers: this.getAuthHeaders(),
+        headers: {
+          ...options.extraHeaders,
+          ...this.getAuthHeaders(),
+        },
       });
     } catch (error: any) {
       if (error.response) {
@@ -156,6 +160,19 @@ export class GoclawClient {
       method: "POST",
       path: `/v1/skills/${skillId}/grants/agent`,
       data: payload,
+    });
+    return response.data;
+  }
+
+  async uploadSkillArchive(
+    formData: unknown,
+    formHeaders: Record<string, string>
+  ): Promise<unknown> {
+    const response = await this.request<unknown>({
+      method: "POST",
+      path: "/v1/skills/upload",
+      data: formData,
+      extraHeaders: formHeaders,
     });
     return response.data;
   }

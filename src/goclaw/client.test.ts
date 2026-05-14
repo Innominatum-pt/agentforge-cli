@@ -325,4 +325,61 @@ describe("GoclawClient skill methods", () => {
     });
     expect(capturedData).toEqual({ agent_id: "a1", version: "2.0" });
   });
+
+  it("calls POST /v1/skills/upload for uploadSkillArchive", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedData: unknown;
+    const transport = createFakeTransport(async ({ method, url, data }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedData = data;
+      return { data: { version: 3 }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.uploadSkillArchive({ fake: "form" }, { "content-type": "multipart/form-data" });
+    expect(capturedMethod).toBe("POST");
+    expect(capturedPath).toBe("https://example.com/v1/skills/upload");
+    expect(capturedData).toEqual({ fake: "form" });
+    expect(result).toEqual({ version: 3 });
+  });
+
+  it("merges auth headers with form headers in uploadSkillArchive", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: { version: 1 }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok", username: "admin" },
+      transport
+    );
+    await client.uploadSkillArchive({}, { "content-type": "multipart/form-data; boundary=abc" });
+    expect(capturedHeaders?.Authorization).toBe("Bearer tok");
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("admin");
+    expect(capturedHeaders?.["content-type"]).toBe("multipart/form-data; boundary=abc");
+  });
+
+  it("does not allow extra headers to override GoClaw auth headers", async () => {
+    let capturedHeaders: Record<string, string> | undefined;
+    const transport = createFakeTransport(async ({ headers }) => {
+      capturedHeaders = headers;
+      return { data: { version: 1 }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "real-token", username: "system-user" },
+      transport
+    );
+    await client.uploadSkillArchive({ fake: "form" }, {
+      "content-type": "multipart/form-data; boundary=abc",
+      Authorization: "Bearer attacker",
+      "X-GoClaw-User-Id": "attacker-user",
+    });
+    expect(capturedHeaders?.Authorization).toBe("Bearer real-token");
+    expect(capturedHeaders?.["X-GoClaw-User-Id"]).toBe("system-user");
+    expect(capturedHeaders?.["content-type"]).toBe("multipart/form-data; boundary=abc");
+  });
 });
