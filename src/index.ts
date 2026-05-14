@@ -11,6 +11,7 @@ import axios from "axios";
 import * as readline from "readline";
 import os from "os";
 import pkg from "../package.json";
+import { createGoclawClientFromConfig } from "./goclaw/client";
 
 function confirmOverwrite(entityType: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -301,10 +302,8 @@ async function getConfig() {
 
 async function resolveAgentId(slug: string, config: any): Promise<string | null> {
   try {
-    const listResponse = await axios.get(`${config.goclaw.api_url}/v1/agents`, {
-      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-    });
-    const agents = listResponse.data.agents || [];
+    const client = createGoclawClientFromConfig(config);
+    const agents = await client.listAgents();
     const agent = agents.find((a: any) => a.agent_key === slug);
     return agent ? agent.id : null;
   } catch (error) {
