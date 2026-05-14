@@ -14,6 +14,21 @@ export interface GoclawListAgentsResponse {
   agents?: GoclawAgent[];
 }
 
+export interface GoclawSkill {
+  id: string;
+  slug: string;
+  [key: string]: unknown;
+}
+
+export interface GoclawListSkillsResponse {
+  skills?: GoclawSkill[];
+}
+
+export interface GrantSkillToAgentPayload {
+  agent_id: string;
+  version?: string | null;
+}
+
 export interface HttpResponse<T> {
   data: T;
   status: number;

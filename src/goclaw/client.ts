@@ -3,6 +3,9 @@ import {
   GoclawClientConfig,
   GoclawAgent,
   GoclawListAgentsResponse,
+  GoclawSkill,
+  GoclawListSkillsResponse,
+  GrantSkillToAgentPayload,
   HttpResponse,
   HttpTransport,
 } from "./types";
@@ -123,6 +126,35 @@ export class GoclawClient {
     const response = await this.request<unknown>({
       method: "PUT",
       path: `/v1/agents/${agentId}`,
+      data: payload,
+    });
+    return response.data;
+  }
+
+  async listSkills(): Promise<GoclawSkill[]> {
+    const response = await this.request<GoclawListSkillsResponse>({
+      method: "GET",
+      path: "/v1/skills",
+    });
+    return response.data.skills || [];
+  }
+
+  async updateSkill(skillId: string, payload: unknown): Promise<unknown> {
+    const response = await this.request<unknown>({
+      method: "PUT",
+      path: `/v1/skills/${skillId}`,
+      data: payload,
+    });
+    return response.data;
+  }
+
+  async grantSkillToAgent(
+    skillId: string,
+    payload: GrantSkillToAgentPayload
+  ): Promise<unknown> {
+    const response = await this.request<unknown>({
+      method: "POST",
+      path: `/v1/skills/${skillId}/grants/agent`,
       data: payload,
     });
     return response.data;
