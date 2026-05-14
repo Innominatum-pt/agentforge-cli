@@ -226,3 +226,103 @@ describe("createGoclawClientFromConfig", () => {
     );
   });
 });
+
+describe("GoclawClient skill methods", () => {
+  it("calls GET /v1/skills for listSkills", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    const transport = createFakeTransport(async ({ method, url }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      return {
+        data: { skills: [{ id: "s1", slug: "test-skill" }] },
+        status: 200,
+        statusText: "OK",
+      };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const skills = await client.listSkills();
+    expect(capturedMethod).toBe("GET");
+    expect(capturedPath).toBe("https://example.com/v1/skills");
+    expect(skills).toEqual([{ id: "s1", slug: "test-skill" }]);
+  });
+
+  it("returns empty array when skills field is missing", async () => {
+    const transport = createFakeTransport(async () => ({
+      data: {},
+      status: 200,
+      statusText: "OK",
+    }));
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const skills = await client.listSkills();
+    expect(skills).toEqual([]);
+  });
+
+  it("calls PUT /v1/skills/:id for updateSkill", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedData: unknown;
+    const transport = createFakeTransport(async ({ method, url, data }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedData = data;
+      return { data: { updated: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.updateSkill("s1", { visibility: "public" });
+    expect(capturedMethod).toBe("PUT");
+    expect(capturedPath).toBe("https://example.com/v1/skills/s1");
+    expect(capturedData).toEqual({ visibility: "public" });
+    expect(result).toEqual({ updated: true });
+  });
+
+  it("calls POST /v1/skills/:id/grants/agent for grantSkillToAgent", async () => {
+    let capturedMethod = "";
+    let capturedPath = "";
+    let capturedData: unknown;
+    const transport = createFakeTransport(async ({ method, url, data }) => {
+      capturedMethod = method;
+      capturedPath = url;
+      capturedData = data;
+      return { data: { granted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    const result = await client.grantSkillToAgent("s1", {
+      agent_id: "a1",
+      version: null,
+    });
+    expect(capturedMethod).toBe("POST");
+    expect(capturedPath).toBe("https://example.com/v1/skills/s1/grants/agent");
+    expect(capturedData).toEqual({ agent_id: "a1", version: null });
+    expect(result).toEqual({ granted: true });
+  });
+
+  it("preserves pinned version in grantSkillToAgent", async () => {
+    let capturedData: unknown;
+    const transport = createFakeTransport(async ({ data }) => {
+      capturedData = data;
+      return { data: { granted: true }, status: 200, statusText: "OK" };
+    });
+    const client = new GoclawClient(
+      { apiUrl: "https://example.com", token: "tok" },
+      transport
+    );
+    await client.grantSkillToAgent("s1", {
+      agent_id: "a1",
+      version: "2.0",
+    });
+    expect(capturedData).toEqual({ agent_id: "a1", version: "2.0" });
+  });
+});
