@@ -548,6 +548,8 @@ async function forceUpdateLocalMemoryDocuments(
   localFilePaths: string[],
   sectionDir: string
 ): Promise<void> {
+  const client = createGoclawClientFromConfig(config);
+
   // Memory document paths are GoClaw catch-all paths.
   // Slashes must remain unencoded. Paths must be relative, e.g. memory/foo.md.
   for (const localPath of localFilePaths) {
@@ -555,10 +557,7 @@ async function forceUpdateLocalMemoryDocuments(
       try {
         const flatFileName = localPath.replace("memory/", "memory_");
         const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
-        const putUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${localPath}`;
-        await axios.put(putUrl, { content }, {
-          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-        });
+        await client.updateMemoryDocument(agentId, localPath, { content });
         console.log(`✅ Edição de memória forçada com sucesso: ${localPath}`);
       } catch (putErr: any) {
         console.warn(`⚠️ Aviso na edição de ${localPath}: O conteúdo pode não ter sido alterado. (${putErr.message})`);
