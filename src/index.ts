@@ -571,18 +571,12 @@ async function pruneOrphanMemoryDocuments(
   config: any,
   localFilePaths: string[]
 ): Promise<void> {
+  const client = createGoclawClientFromConfig(config);
+
   // Memory document paths are GoClaw catch-all paths.
   // Slashes must remain unencoded. Paths must be relative, e.g. memory/foo.md.
   try {
-    const documentsUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`;
-    const docsResponse = await axios.get(documentsUrl, {
-      headers: {
-        Authorization: `Bearer ${config.goclaw.token}`,
-        "X-GoClaw-User-Id": config.goclaw.username || "system"
-      }
-    });
-
-    const remoteDocs = docsResponse.data || [];
+    const remoteDocs = await client.listMemoryDocuments(agentId);
     let deletedCount = 0;
 
     for (const doc of remoteDocs) {
@@ -592,17 +586,14 @@ async function pruneOrphanMemoryDocuments(
         console.log(`🧹 Removendo memória órfã no servidor: ${doc.path}`);
 
         try {
-          const deleteUrl = `${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents/${doc.path}`;
-          await axios.delete(deleteUrl, {
-            headers: {
-              Authorization: `Bearer ${config.goclaw.token}`,
-              "X-GoClaw-User-Id": doc.user_id || config.goclaw.username || "system"
-            }
+          await client.deleteMemoryDocument(agentId, doc.path, {
+            requestUserId: doc.user_id || config.goclaw.username || "system"
           });
           deletedCount++;
         } catch (delErr: any) {
-          const errorData = delErr.response?.data?.error || "";
-          if (delErr.response?.status === 500 && errorData.includes("not found")) {
+          const status = delErr.status || delErr.response?.status;
+          const errorData = delErr.responseData?.error || delErr.response?.data?.error || "";
+          if (status === 500 && errorData.includes("not found")) {
             console.log(`✅ ${doc.path} já estava removido da base de dados.`);
           } else {
             console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
