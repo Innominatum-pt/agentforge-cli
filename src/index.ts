@@ -665,7 +665,7 @@ async function deployAgent(slug: string, config: any) {
   } catch (error: any) {
     console.error(
       `❌ Erro no deploy de "${slug}":`,
-      error.responseData || error.message
+      error.responseData || error.response?.data || error.message
     );
   }
 }
