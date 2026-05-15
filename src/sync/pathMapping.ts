@@ -20,6 +20,22 @@ export function archiveNameToLocalContextFile(archiveName: string): string {
   return archiveName;
 }
 
+export function archiveContextNameToLogicalPath(archiveName: string): string {
+  return archiveNameToLocalContextFile(archiveName);
+}
+
+export function logicalPathToArchiveContextName(logicalPath: string): string {
+  return localContextFileToArchiveName(logicalPath);
+}
+
+export function memoryDocumentPathToFlatArchiveName(documentPath: string): string {
+  return documentPath.replace(/[\/\\]/g, "_");
+}
+
+export function localMemoryPathToFlatArchiveName(localPath: string): string {
+  return localPath.replace("memory/", "memory_");
+}
+
 export function localSkillFolderToRemoteSlug(localPathOrSlug: string): string {
   return localPathOrSlug.replace(/\\/g, "/").replace(/^system\//, "");
 }

@@ -11,6 +11,11 @@ import * as readline from "readline";
 import os from "os";
 import pkg from "../package.json";
 import { createGoclawClientFromConfig } from "./goclaw/client";
+import {
+  archiveContextNameToLogicalPath,
+  memoryDocumentPathToFlatArchiveName,
+  localMemoryPathToFlatArchiveName,
+} from "./sync/pathMapping";
 
 function confirmOverwrite(entityType: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -472,13 +477,7 @@ async function prepareContextFilesExport(
 
   const sectionEntries = await collectFilesRecursive(sectionDir, sectionDir);
   for (const entry of sectionEntries) {
-    let finalEntry = entry;
-    if (entry.startsWith("memory_")) {
-      finalEntry = entry.replace("memory_", "memory/");
-    } else if (entry.startsWith("_system_")) {
-      finalEntry = entry.replace("_system_", "_system/");
-    }
-    localFilePaths.push(finalEntry);
+    localFilePaths.push(archiveContextNameToLogicalPath(entry));
   }
 
   const sectionsArray = Array.from(sections);
@@ -497,7 +496,7 @@ async function injectGhostPlaceholders(
     const preDocs = await client.listMemoryDocuments(agentId);
     for (const pDoc of preDocs) {
       if (pDoc.path && !localFilePaths.includes(pDoc.path)) {
-        const flatGhost = pDoc.path.replace(/[\/\\]/g, '_');
+        const flatGhost = memoryDocumentPathToFlatArchiveName(pDoc.path);
         const ghostPath = path.join(tempExportDir, "context_files", flatGhost);
         await fs.ensureDir(path.dirname(ghostPath));
         await fs.writeFile(ghostPath, " ");
@@ -551,7 +550,7 @@ async function forceUpdateLocalMemoryDocuments(
   for (const localPath of localFilePaths) {
     if (localPath.startsWith('memory/') && localPath.endsWith('.md')) {
       try {
-        const flatFileName = localPath.replace("memory/", "memory_");
+        const flatFileName = localMemoryPathToFlatArchiveName(localPath);
         const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
         await client.updateMemoryDocument(agentId, localPath, { content });
         console.log(`✅ Edição de memória forçada com sucesso: ${localPath}`);
@@ -947,7 +946,7 @@ async function pullAgent(slug: string, agentId: string, config: any) {
     const pathMap: Record<string, string> = {};
     memoryDocs.forEach((d: any) => {
       if (d.path) {
-        const flat = d.path.replace(/[\/\\]/g, '_');
+        const flat = memoryDocumentPathToFlatArchiveName(d.path);
         pathMap[flat] = d.path;
       }
     });
