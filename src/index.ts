@@ -16,10 +16,12 @@ import {
   injectGhostPlaceholders,
   createContextTarball,
   importContextArchive,
-  forceUpdateLocalMemoryDocuments,
-  pruneOrphanMemoryDocuments,
   cleanupContextSyncTempFiles,
 } from "./sync/contextSync";
+import {
+  forceUpdateLocalMemoryDocuments,
+  pruneOrphanMemoryDocuments,
+} from "./sync/memorySync";
 import { buildMemoryPathMap } from "./sync/pullAgentSync";
 
 function confirmOverwrite(entityType: string): Promise<boolean> {

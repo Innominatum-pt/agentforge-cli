@@ -26,7 +26,15 @@ describe("command layer context sync architecture", () => {
 
     expect(contextSyncSource).toMatch(/\bfunction\s+prepareContextFilesExport\b/);
     expect(contextSyncSource).toMatch(/\bfunction\s+injectGhostPlaceholders\b/);
-    expect(contextSyncSource).toMatch(/\bfunction\s+forceUpdateLocalMemoryDocuments\b/);
-    expect(contextSyncSource).toMatch(/\bfunction\s+pruneOrphanMemoryDocuments\b/);
+  });
+
+  it("keeps memory document CRUD helpers in src/sync/memorySync.ts", () => {
+    const memorySyncSource = readFileSync(
+      path.join(repoRoot, "src/sync/memorySync.ts"),
+      "utf8"
+    );
+
+    expect(memorySyncSource).toMatch(/\bfunction\s+forceUpdateLocalMemoryDocuments\b/);
+    expect(memorySyncSource).toMatch(/\bfunction\s+pruneOrphanMemoryDocuments\b/);
   });
 });
