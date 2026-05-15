@@ -11,7 +11,6 @@ import * as readline from "readline";
 import os from "os";
 import pkg from "../package.json";
 import { createGoclawClientFromConfig } from "./goclaw/client";
-import { memoryDocumentPathToFlatArchiveName } from "./sync/pathMapping";
 import {
   prepareContextFilesExport,
   injectGhostPlaceholders,
@@ -21,6 +20,7 @@ import {
   pruneOrphanMemoryDocuments,
   cleanupContextSyncTempFiles,
 } from "./sync/contextSync";
+import { buildMemoryPathMap } from "./sync/pullAgentSync";
 
 function confirmOverwrite(entityType: string): Promise<boolean> {
   const rl = readline.createInterface({
@@ -754,13 +754,7 @@ async function pullAgent(slug: string, agentId: string, config: any) {
 
     // Obter os caminhos reais (com barras) da API para reverter o flattening do export
     const memoryDocs = await client.listMemoryDocuments(agentId);
-    const pathMap: Record<string, string> = {};
-    memoryDocs.forEach((d: any) => {
-      if (d.path) {
-        const flat = memoryDocumentPathToFlatArchiveName(d.path);
-        pathMap[flat] = d.path;
-      }
-    });
+    const pathMap = buildMemoryPathMap(memoryDocs);
 
     await tar.x({
       file: tempTarPath,
