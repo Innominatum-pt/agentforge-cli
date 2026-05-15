@@ -41,3 +41,11 @@
 - Runtime pullAgent() is intentionally unchanged.
 - Export/archive pull remains separate from memory document CRUD.
 - Future migration must preserve archive responseType and local reconstruction semantics.
+
+### 2026-05-14 — Skill pull client methods added without runtime migration
+
+- PR #19 adds client methods for the existing skill pull export/fallback endpoints.
+- Runtime pullAllSkills() is intentionally unchanged.
+- Skill export uses arraybuffer because current runtime writes the tarball to disk before extraction.
+- Skill file fallback preserves encodeURIComponent(file.path).
+- This differs from memory document paths, which are GoClaw catch-all paths and must preserve slashes.

@@ -46,6 +46,21 @@ export interface HttpResponse<T> {
   headers?: Record<string, string>;
 }
 
+export interface GoclawSkillFile {
+  path: string;
+  isDir?: boolean;
+  [key: string]: unknown;
+}
+
+export interface GoclawListSkillFilesResponse {
+  files?: GoclawSkillFile[];
+}
+
+export interface GoclawSkillFileContent {
+  content?: string;
+  [key: string]: unknown;
+}
+
 export interface HttpTransport {
   request<T = unknown>(options: {
     method: "GET" | "POST" | "PUT" | "DELETE";

@@ -8,6 +8,9 @@ import {
   GrantSkillToAgentPayload,
   GoclawMemoryDocument,
   UpdateMemoryDocumentPayload,
+  GoclawSkillFile,
+  GoclawListSkillFilesResponse,
+  GoclawSkillFileContent,
   HttpResponse,
   HttpTransport,
 } from "./types";
@@ -250,6 +253,34 @@ export class GoclawClient {
       method: "GET",
       path: `/v1/agents/${agentId}/export`,
       responseType: "stream",
+    });
+    return response.data;
+  }
+
+  async exportSkillArchive(slug: string): Promise<unknown> {
+    const response = await this.request<unknown>({
+      method: "GET",
+      path: `/v1/skills/export?slugs=${encodeURIComponent(slug)}`,
+      responseType: "arraybuffer",
+    });
+    return response.data;
+  }
+
+  async listSkillFiles(skillId: string): Promise<GoclawSkillFile[]> {
+    const response = await this.request<GoclawListSkillFilesResponse>({
+      method: "GET",
+      path: `/v1/skills/${skillId}/files`,
+    });
+    return response.data.files || [];
+  }
+
+  async getSkillFileContent(
+    skillId: string,
+    filePath: string
+  ): Promise<GoclawSkillFileContent> {
+    const response = await this.request<GoclawSkillFileContent>({
+      method: "GET",
+      path: `/v1/skills/${skillId}/files/${encodeURIComponent(filePath)}`,
     });
     return response.data;
   }
