@@ -49,3 +49,10 @@
 - Skill export uses arraybuffer because current runtime writes the tarball to disk before extraction.
 - Skill file fallback preserves encodeURIComponent(file.path).
 - This differs from memory document paths, which are GoClaw catch-all paths and must preserve slashes.
+
+### 2026-05-15 — context_files and memory/documents separated in sync modules
+
+- GoClaw context_files archive import/export and memory/documents CRUD are different domains.
+- contextSync.ts is for context_files archive preparation/import and its ghost placeholder workaround.
+- memorySync.ts is for memory document update and pruning.
+- Runtime behaviour is unchanged.
