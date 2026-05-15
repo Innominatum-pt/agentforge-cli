@@ -825,14 +825,9 @@ async function pullAllSkills(config: any) {
       // Método 1: Export individual (Muito mais robusto para Managed/Store Skills)
       // O endpoint /v1/skills/export?slugs=... garante que recebemos o tarball completo da skill
       try {
-        const exportUrl = `${config.goclaw.api_url}/v1/skills/export?slugs=${skill.slug}`;
-        const exportRes = await axios.get(exportUrl, {
-          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" },
-          responseType: 'arraybuffer'
-        });
-
         const tempTarPath = path.join(os.tmpdir(), `af-skill-${skill.slug}-${Date.now()}.tar.gz`);
-        await fs.writeFile(tempTarPath, exportRes.data);
+        const exportData = await client.exportSkillArchive(skill.slug);
+        await fs.writeFile(tempTarPath, exportData as any);
 
         const tempExtractDir = path.join(os.tmpdir(), `af-extract-${skill.slug}-${Date.now()}`);
         await fs.ensureDir(tempExtractDir);
@@ -858,11 +853,7 @@ async function pullAllSkills(config: any) {
         // Método 2: Download cirúrgico de ficheiros (Fallback para Workspace mode)
         console.warn(`⚠️ Export falhou para ${skill.slug}, tentando download direto...`);
         
-        const filesRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files`, {
-          headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-        });
-        
-        const files = filesRes.data.files || [];
+        const files = await client.listSkillFiles(skill.id);
         if (files.length === 0) {
           console.warn(`⚠️ A skill ${skill.slug} não parece ter ficheiros adicionais.`);
         }
@@ -870,14 +861,13 @@ async function pullAllSkills(config: any) {
         for (const file of files) {
           if (file.isDir) continue;
           try {
-            const fileContentRes = await axios.get(`${config.goclaw.api_url}/v1/skills/${skill.id}/files/${encodeURIComponent(file.path)}`, {
-              headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-            });
+            const fileContent = await client.getSkillFileContent(skill.id, file.path);
             const filePath = path.join(skillLocalPath, file.path);
             await fs.ensureDir(path.dirname(filePath));
-            await fs.writeFile(filePath, fileContentRes.data.content || "");
+            await fs.writeFile(filePath, fileContent.content || "");
           } catch (fErr: any) {
-            console.error(`  ❌ Falha no ficheiro ${file.path}: ${fErr.message}`);
+            const message = fErr.responseData || fErr.response?.data || fErr.message;
+            console.error(`  ❌ Falha no ficheiro ${file.path}: ${message}`);
           }
         }
       }
