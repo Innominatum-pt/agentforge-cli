@@ -7,7 +7,6 @@ import slugify from "slugify";
 import AdmZip from "adm-zip";
 import FormData from "form-data";
 import * as tar from "tar";
-import axios from "axios";
 import * as readline from "readline";
 import os from "os";
 import pkg from "../package.json";
@@ -944,11 +943,9 @@ async function pullAgent(slug: string, agentId: string, config: any) {
     }
 
     // Obter os caminhos reais (com barras) da API para reverter o flattening do export
-    const docsRes = await axios.get(`${config.goclaw.api_url}/v1/agents/${agentId}/memory/documents`, {
-      headers: { Authorization: `Bearer ${config.goclaw.token}`, "X-GoClaw-User-Id": config.goclaw.username || "system" }
-    });
+    const memoryDocs = await client.listMemoryDocuments(agentId);
     const pathMap: Record<string, string> = {};
-    (docsRes.data || []).forEach((d: any) => {
+    memoryDocs.forEach((d: any) => {
       if (d.path) {
         const flat = d.path.replace(/[\/\\]/g, '_');
         pathMap[flat] = d.path;
