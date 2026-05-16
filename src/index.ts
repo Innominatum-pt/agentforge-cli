@@ -51,7 +51,7 @@ function getWorkspaceRoot(): string {
   if (fs.existsSync(path.join(dir, "agentforge.json")) || fs.existsSync(path.join(dir, "agentforge.yml"))) {
     return dir;
   }
-  console.error("❌ Erro: Não foi possível encontrar a raiz do workspace (agentforge.json). Certifique-se de estar dentro do projeto.");
+  logger.error("❌ Erro: Não foi possível encontrar a raiz do workspace (agentforge.json). Certifique-se de estar dentro do projeto.");
   process.exit(1);
 }
 
@@ -302,7 +302,7 @@ async function getConfig() {
   const root = getWorkspaceRoot();
   const configPath = path.join(root, "agentforge.json");
   if (!(await fs.pathExists(configPath))) {
-    console.error("❌ Arquivo agentforge.json não encontrado. Execute 'agentforge init' primeiro.");
+    logger.error("❌ Arquivo agentforge.json não encontrado. Execute 'agentforge init' primeiro.");
     process.exit(1);
   }
   const config = await fs.readJson(configPath);
