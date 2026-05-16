@@ -285,7 +285,7 @@ buildCmd
     const zipPath = path.join(exportsPath, `${slug}.zip`);
 
     if (!(await fs.pathExists(skillPath))) {
-      console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
+      logger.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
       process.exit(1);
     }
 
@@ -295,7 +295,7 @@ buildCmd
     zip.addLocalFolder(skillPath, "");
     zip.writeZip(zipPath);
 
-    console.log(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
+    logger.info(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
   });
 
 async function getConfig() {
