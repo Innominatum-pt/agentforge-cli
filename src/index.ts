@@ -11,6 +11,7 @@ import * as readline from "readline";
 import os from "os";
 import pkg from "../package.json";
 import { createGoclawClientFromConfig } from "./goclaw/client";
+import { logger } from "./core/logger";
 import {
   prepareContextFilesExport,
   injectGhostPlaceholders,
@@ -122,7 +123,7 @@ program
       await fs.copy(cliDocPath, workspaceDocPath);
     }
 
-    console.log("Workspace de agentes criado com sucesso.");
+    logger.info("Workspace de agentes criado com sucesso.");
   });
 
 const newCmd = program
@@ -137,9 +138,9 @@ program
     const cliManualPath = path.join(__dirname, "../templates/CLI_MANUAL.md");
     if (await fs.pathExists(cliManualPath)) {
       const content = await fs.readFile(cliManualPath, "utf-8");
-      console.log(content);
+      logger.raw(content);
     } else {
-      console.error("❌ Manual não encontrado.");
+      logger.error("❌ Manual não encontrado.");
     }
   });
 
