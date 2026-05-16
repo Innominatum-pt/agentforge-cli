@@ -154,7 +154,7 @@ newCmd
     const agentPath = path.join(basePath, "agents", slug);
 
     if (await fs.pathExists(agentPath)) {
-      console.error(`❌ O agente "${name}" já existe em agents/${slug}.`);
+      logger.error(`❌ O agente "${name}" já existe em agents/${slug}.`);
       process.exit(1);
     }
 
@@ -192,9 +192,9 @@ newCmd
         // Fallback se não conseguir ler config
       }
       
-      console.log(`✅ Agente "${name}" criado com sucesso em agents/${slug} usando templates!`);
+      logger.info(`✅ Agente "${name}" criado com sucesso em agents/${slug} usando templates!`);
     } else {
-      console.warn("⚠️ Nenhuma pasta de templates encontrada. Criando estrutura básica...");
+      logger.warn("⚠️ Nenhuma pasta de templates encontrada. Criando estrutura básica...");
       
       try {
         const config = await getConfig();
@@ -219,7 +219,7 @@ newCmd
         path.join(agentPath, "HEARTBEAT.md"),
         `# Instruções de Heartbeat\n`
       );
-      console.log(`✅ Agente "${name}" criado com sucesso em agents/${slug}.`);
+      logger.info(`✅ Agente "${name}" criado com sucesso em agents/${slug}.`);
     }
   });
 
@@ -233,7 +233,7 @@ newCmd
     const skillPath = path.join(basePath, "skills", slug);
 
     if (await fs.pathExists(skillPath)) {
-      console.error(`❌ A skill "${name}" já existe em skills/${slug}.`);
+      logger.error(`❌ A skill "${name}" já existe em skills/${slug}.`);
       process.exit(1);
     }
 
@@ -260,14 +260,14 @@ newCmd
         await fs.writeFile(skillMdPath, content);
       }
       
-      console.log(`✅ Skill "${name}" criada com sucesso em skills/${slug} usando templates!`);
+      logger.info(`✅ Skill "${name}" criada com sucesso em skills/${slug} usando templates!`);
     } else {
-      console.warn("⚠️ Nenhum template de skill encontrado. Criando um SKILL.md vazio.");
+      logger.warn("⚠️ Nenhum template de skill encontrado. Criando um SKILL.md vazio.");
       await fs.writeFile(
         path.join(skillPath, "SKILL.md"),
         `---\nname: "${name}"\ndescription: "Skill description"\ndeps: []\n---\n\n## Instruções\n`
       );
-      console.log(`✅ Skill "${name}" criada com sucesso em skills/${slug}.`);
+      logger.info(`✅ Skill "${name}" criada com sucesso em skills/${slug}.`);
     }
   });
 
