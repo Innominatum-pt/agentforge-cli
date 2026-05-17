@@ -782,35 +782,35 @@ pullCmd
   .action(async () => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
       process.exit(1);
     }
 
     if (!(await confirmOverwrite("agentes"))) {
-      console.log("❌ Pull cancelado pelo utilizador.");
+      logger.info("❌ Pull cancelado pelo utilizador.");
       return;
     }
 
-    console.log("🧹 Limpando a pasta local de agentes...");
+    logger.info("🧹 Limpando a pasta local de agentes...");
     await fs.emptyDir(path.join(getWorkspaceRoot(), "agents"));
 
-    console.log("📥 Buscando lista de agentes do GoClaw...");
+    logger.info("📥 Buscando lista de agentes do GoClaw...");
     try {
       const client = createGoclawClientFromConfig(config);
       const agents = await client.listAgents();
-      console.log(`Encontrados ${agents.length} agentes. Sincronizando...`);
+      logger.info(`Encontrados ${agents.length} agentes. Sincronizando...`);
 
       for (const agent of agents) {
         const slug = agent.agent_key;
         await pullAgent(slug, agent.id, config);
       }
 
-      console.log("✅ Pull de agentes concluído com sucesso!");
+      logger.info("✅ Pull de agentes concluído com sucesso!");
     } catch (error: any) {
       if (error.response?.status || error.status) {
-        console.error(`❌ Erro durante o pull dos agentes: HTTP ${error.response?.status || error.status} - Verifique suas credenciais e permissões no agentforge.json (username deve ser o dono do agente).`);
+        logger.error(`❌ Erro durante o pull dos agentes: HTTP ${error.response?.status || error.status} - Verifique suas credenciais e permissões no agentforge.json (username deve ser o dono do agente).`);
       } else {
-        console.error("❌ Erro durante o pull dos agentes:", error.message);
+        logger.error("❌ Erro durante o pull dos agentes:", error.message);
       }
     }
   });
