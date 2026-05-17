@@ -709,24 +709,24 @@ pullCmd
   .action(async () => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
       process.exit(1);
     }
 
     if (!(await confirmOverwrite("skills"))) {
-      console.log("❌ Pull cancelado pelo utilizador.");
+      logger.info("❌ Pull cancelado pelo utilizador.");
       return;
     }
 
     try {
       await pullAllSkills(config);
-      console.log("✅ Pull de skills concluído com sucesso! As skills foram atualizadas localmente.");
+      logger.info("✅ Pull de skills concluído com sucesso! As skills foram atualizadas localmente.");
     } catch (error: any) {
-      console.error("❌ Erro durante o pull das skills:");
+      logger.error("❌ Erro durante o pull das skills:");
       if (error.response?.status || error.status) {
-        console.error(`Status HTTP ${error.response?.status || error.status}`);
+        logger.error(`Status HTTP ${error.response?.status || error.status}`);
       } else {
-        console.error(error.responseData || error.response?.data || error.message);
+        logger.error(error.responseData || error.response?.data || error.message);
       }
     }
   });
