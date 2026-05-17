@@ -68,4 +68,13 @@ describe("logger migration regression guard", () => {
     );
     expectNoDirectConsole(region);
   });
+
+  it("keeps resolveAgentId on logger", () => {
+    const region = sliceBetween(
+      indexSource,
+      "async function resolveAgentId",
+      "const deployCmd = program"
+    );
+    expectNoDirectConsole(region);
+  });
 });
