@@ -438,7 +438,7 @@ async function deployContextFiles(slug: string, config: any, resolvedId?: string
   const itemsToSync = files.filter(f => f !== 'agent.json' && f !== 'README.md');
 
   if (itemsToSync.length === 0) {
-    console.log(`Nenhum ficheiro de contexto ou memória encontrado para "${slug}".`);
+    logger.info(`Nenhum ficheiro de contexto ou memória encontrado para "${slug}".`);
     return;
   }
 
