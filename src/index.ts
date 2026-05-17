@@ -418,7 +418,7 @@ deployCmd
   .action(async (slug: string) => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
       process.exit(1);
     }
 
@@ -501,16 +501,16 @@ deployCmd
   .action(async (slug: string) => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
       process.exit(1);
     }
-    
-    console.log(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
+
+    logger.info(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
     try {
       await deployContextFiles(slug, config);
-      console.log("✅ Deploy de contexto concluído!");
+      logger.info("✅ Deploy de contexto concluído!");
     } catch (error: any) {
-      console.error("❌ Erro ao enviar contexto:", error.responseData || error.response?.data || error.message);
+      logger.error("❌ Erro ao enviar contexto:", error.responseData || error.response?.data || error.message);
     }
   });
 
@@ -520,7 +520,7 @@ deployCmd
   .action(async (slug: string) => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
       process.exit(1);
     }
 
@@ -570,12 +570,12 @@ deployCmd
   .action(async () => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
       process.exit(1);
     }
     const basePath = getWorkspaceRoot();
     await deployAllAgents(config, basePath);
-    console.log("🏁 Deploy de agentes concluído!");
+    logger.info("🏁 Deploy de agentes concluído!");
   });
 
 deployCmd
@@ -584,12 +584,12 @@ deployCmd
   .action(async () => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
       process.exit(1);
     }
     const basePath = getWorkspaceRoot();
     await deployAllSkills(config, basePath);
-    console.log("🏁 Deploy de skills concluído!");
+    logger.info("🏁 Deploy de skills concluído!");
   });
 
 deployCmd
@@ -598,15 +598,15 @@ deployCmd
   .action(async () => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error("❌ Configure sua chave de API (token) no agentforge.json.");
+      logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
       process.exit(1);
     }
 
     const basePath = getWorkspaceRoot();
     await deployAllAgents(config, basePath);
     await deployAllSkills(config, basePath);
-    
-    console.log("🏁 Deploy completo (agentes e skills) concluído!");
+
+    logger.info("🏁 Deploy completo (agentes e skills) concluído!");
   });
 
 const pullCmd = program
