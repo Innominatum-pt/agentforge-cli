@@ -334,7 +334,7 @@ async function deploySkill(slug: string, config: any, basePath: string) {
   const zipPath = path.join(exportsPath, `${safeSlug}.zip`);
 
   if (!(await fs.pathExists(skillPath))) {
-    console.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
+    logger.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
     return;
   }
   
@@ -343,7 +343,7 @@ async function deploySkill(slug: string, config: any, basePath: string) {
   zip.addLocalFolder(skillPath, "");
   zip.writeZip(zipPath);
   
-  console.log(`🚀 Fazendo upload da skill "${slug}" para o GoClaw...`);
+  logger.info(`🚀 Fazendo upload da skill "${slug}" para o GoClaw...`);
   const form = new FormData();
   form.append("file", fs.createReadStream(zipPath));
 
@@ -351,9 +351,9 @@ async function deploySkill(slug: string, config: any, basePath: string) {
     const client = createGoclawClientFromConfig(config);
     const data = (await client.uploadSkillArchive(form, form.getHeaders())) as any;
     if (data && data.version) {
-      console.log(`✅ Arquivos da skill "${slug}" atualizados (versão ${data.version}).`);
+      logger.info(`✅ Arquivos da skill "${slug}" atualizados (versão ${data.version}).`);
     } else {
-      console.log(`✅ Arquivos da skill "${slug}" atualizados.`);
+      logger.info(`✅ Arquivos da skill "${slug}" atualizados.`);
     }
 
     // Sincronizar metadados (visibility, description, tags, etc)
@@ -363,7 +363,7 @@ async function deploySkill(slug: string, config: any, basePath: string) {
     if (remoteSkill) {
       const metadataPath = path.join(skillPath, "metadata.json");
       if (await fs.pathExists(metadataPath)) {
-        console.log(`🚀 Sincronizando metadados da skill "${slug}"...`);
+        logger.info(`🚀 Sincronizando metadados da skill "${slug}"...`);
         const metadata = await fs.readJson(metadataPath);
 
         // Remover campos que não devem ser enviados no PUT
@@ -373,13 +373,13 @@ async function deploySkill(slug: string, config: any, basePath: string) {
         delete payload.name;
 
         await client.updateSkill(remoteSkill.id, payload);
-        console.log(`✅ Metadados sincronizados com sucesso.`);
+        logger.info(`✅ Metadados sincronizados com sucesso.`);
       }
 
       // Sincronizar permissões (grants)
       const grantsPath = path.join(skillPath, "grants.jsonl");
       if (await fs.pathExists(grantsPath)) {
-        console.log(`🚀 Sincronizando permissões (grants) da skill "${slug}"...`);
+        logger.info(`🚀 Sincronizando permissões (grants) da skill "${slug}"...`);
         const grantsContent = await fs.readFile(grantsPath, 'utf8');
         const lines = grantsContent.split('\n').filter(l => l.trim());
 
@@ -393,22 +393,22 @@ async function deploySkill(slug: string, config: any, basePath: string) {
                   agent_id: agentId,
                   version: grant.pinned_version || null,
                 });
-                console.log(`   ➕ Permissão concedida ao agente: ${grant.agent_key}`);
+                logger.info(`   ➕ Permissão concedida ao agente: ${grant.agent_key}`);
               }
             }
           } catch (e: any) {
-            console.warn(
+            logger.warn(
               `   ⚠️ Falha ao conceder permissão: ${e.responseData || e.response?.data?.error || e.message}`
             );
           }
         }
-        console.log(`✅ Permissões sincronizadas.`);
+        logger.info(`✅ Permissões sincronizadas.`);
       }
     }
 
   } catch (error: any) {
-    console.error(`❌ Erro no deploy da skill "${slug}":`);
-    console.error(error.responseData || error.response?.data || error.message);
+    logger.error(`❌ Erro no deploy da skill "${slug}":`);
+    logger.error(error.responseData || error.response?.data || error.message);
   }
 }
 
