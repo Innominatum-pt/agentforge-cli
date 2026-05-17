@@ -617,13 +617,13 @@ async function pullAllSkills(config: any) {
   const workspaceRoot = getWorkspaceRoot();
   const skillsDir = path.join(workspaceRoot, "skills");
 
-  console.log("🧹 Limpando a pasta local de skills...");
+  logger.info("🧹 Limpando a pasta local de skills...");
   await fs.emptyDir(skillsDir);
 
-  console.log("📥 Obtendo lista de skills do GoClaw...");
+  logger.info("📥 Obtendo lista de skills do GoClaw...");
   const client = createGoclawClientFromConfig(config);
   const skills = await client.listSkills();
-  console.log(`🔍 Encontradas ${skills.length} skills no servidor.`);
+  logger.info(`🔍 Encontradas ${skills.length} skills no servidor.`);
 
   for (const skill of skills) {
     try {
@@ -632,7 +632,7 @@ async function pullAllSkills(config: any) {
       const skillLocalPath = path.join(skillsDir, targetFolder);
       await fs.ensureDir(skillLocalPath);
 
-      console.log(`📦 Baixando skill: ${skill.slug}...`);
+      logger.info(`📦 Baixando skill: ${skill.slug}...`);
 
       // Método 1: Export individual (Muito mais robusto para Managed/Store Skills)
       // O endpoint /v1/skills/export?slugs=... garante que recebemos o tarball completo da skill
@@ -663,11 +663,11 @@ async function pullAllSkills(config: any) {
         
       } catch (exportErr: any) {
         // Método 2: Download cirúrgico de ficheiros (Fallback para Workspace mode)
-        console.warn(`⚠️ Export falhou para ${skill.slug}, tentando download direto...`);
+        logger.warn(`⚠️ Export falhou para ${skill.slug}, tentando download direto...`);
         
         const files = await client.listSkillFiles(skill.id);
         if (files.length === 0) {
-          console.warn(`⚠️ A skill ${skill.slug} não parece ter ficheiros adicionais.`);
+          logger.warn(`⚠️ A skill ${skill.slug} não parece ter ficheiros adicionais.`);
         }
 
         for (const file of files) {
@@ -679,7 +679,7 @@ async function pullAllSkills(config: any) {
             await fs.writeFile(filePath, fileContent.content || "");
           } catch (fErr: any) {
             const message = fErr.responseData || fErr.response?.data || fErr.message;
-            console.error(`  ❌ Falha no ficheiro ${file.path}: ${message}`);
+            logger.error(`  ❌ Falha no ficheiro ${file.path}: ${message}`);
           }
         }
       }
@@ -698,7 +698,7 @@ async function pullAllSkills(config: any) {
       }
 
     } catch (err: any) {
-      console.error(`❌ Erro processando skill ${skill.slug}: ${err.message}`);
+      logger.error(`❌ Erro processando skill ${skill.slug}: ${err.message}`);
     }
   }
 }
