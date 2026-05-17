@@ -822,26 +822,26 @@ pullCmd
   .action(async () => {
     const config = await getConfig();
     if (!config.goclaw || !config.goclaw.token) {
-      console.error('❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.');
+      logger.error('❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.');
       process.exit(1);
     }
-    
+
     if (!(await confirmOverwrite('TUDO (agentes e skills)'))) {
-      console.log('❌ Pull cancelado pelo utilizador.');
+      logger.info('❌ Pull cancelado pelo utilizador.');
       return;
     }
-    
-    console.log('🔄 Iniciando sincronização completa (pull all)...');
-    
+
+    logger.info('🔄 Iniciando sincronização completa (pull all)...');
+
     // PULL SKILLS INLINE
-    console.log('\n--- [1/2] SKILLS ---');
+    logger.info('\n--- [1/2] SKILLS ---');
     try {
       await pullAllSkills(config);
-      console.log('✅ Pull de skills concluído!');
+      logger.info('✅ Pull de skills concluído!');
     } catch (error: any) {
-      console.error('❌ Erro durante o pull das skills:', error.message);
+      logger.error('❌ Erro durante o pull das skills:', error.message);
     }
-    
+
     // PULL AGENTS INLINE
     console.log('\n--- [2/2] AGENTS ---');
     try {
