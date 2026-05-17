@@ -465,12 +465,12 @@ async function deployAgent(slug: string, config: any) {
   const agentJsonPath = path.join(agentPath, "agent.json");
 
   if (!(await fs.pathExists(agentJsonPath))) {
-    console.error(`❌ agent.json não encontrado em agents/${slug}.`);
+    logger.error(`❌ agent.json não encontrado em agents/${slug}.`);
     return;
   }
 
   const agentConfig = await fs.readJson(agentJsonPath);
-  console.log(`🚀 Sincronizando agente "${slug}"...`);
+  logger.info(`🚀 Sincronizando agente "${slug}"...`);
 
   try {
     const client = createGoclawClientFromConfig(config);
@@ -479,16 +479,16 @@ async function deployAgent(slug: string, config: any) {
 
     if (!exists) {
       await client.createAgent(agentConfig);
-      console.log(`✅ Agente "${slug}" criado.`);
+      logger.info(`✅ Agente "${slug}" criado.`);
     } else {
       await client.updateAgent(agentId, agentConfig);
-      console.log(`✅ Configuração de "${slug}" atualizada.`);
+      logger.info(`✅ Configuração de "${slug}" atualizada.`);
     }
 
     await deployContextFiles(slug, config, agentId);
-    console.log(`✅ Agente "${slug}" sincronizado com sucesso!`);
+    logger.info(`✅ Agente "${slug}" sincronizado com sucesso!`);
   } catch (error: any) {
-    console.error(
+    logger.error(
       `❌ Erro no deploy de "${slug}":`,
       error.responseData || error.response?.data || error.message
     );
