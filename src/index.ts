@@ -732,7 +732,7 @@ pullCmd
   });
 
 async function pullAgent(slug: string, agentId: string, config: any) {
-  console.log(`📦 Baixando agente: ${slug}...`);
+  logger.info(`📦 Baixando agente: ${slug}...`);
   
   const client = createGoclawClientFromConfig(config);
   const exportStream = await client.exportAgentArchive(agentId);
