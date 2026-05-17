@@ -41,4 +41,24 @@ describe("logger", () => {
     expect(logSpy).toHaveBeenCalledWith("hello raw");
     expect(logSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("info calls console.log with multiple arguments", () => {
+    logger.info("hello", { a: 1 });
+    expect(logSpy).toHaveBeenCalledWith("hello", { a: 1 });
+  });
+
+  it("warn calls console.warn with multiple arguments", () => {
+    logger.warn("warn", { a: 1 });
+    expect(warnSpy).toHaveBeenCalledWith("warn", { a: 1 });
+  });
+
+  it("error calls console.error with multiple arguments", () => {
+    logger.error("error", { a: 1 });
+    expect(errorSpy).toHaveBeenCalledWith("error", { a: 1 });
+  });
+
+  it("raw calls console.log with multiple arguments", () => {
+    logger.raw("raw", { a: 1 });
+    expect(logSpy).toHaveBeenCalledWith("raw", { a: 1 });
+  });
 });

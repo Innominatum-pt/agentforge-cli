@@ -1,17 +1,17 @@
 export const logger = {
-  info(message: string): void {
-    console.log(message);
+  info(...args: unknown[]): void {
+    console.log(...args);
   },
 
-  warn(message: string): void {
-    console.warn(message);
+  warn(...args: unknown[]): void {
+    console.warn(...args);
   },
 
-  error(message: string): void {
-    console.error(message);
+  error(...args: unknown[]): void {
+    console.error(...args);
   },
 
-  raw(message: string): void {
-    console.log(message);
+  raw(...args: unknown[]): void {
+    console.log(...args);
   },
 };

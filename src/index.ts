@@ -510,7 +510,7 @@ deployCmd
       await deployContextFiles(slug, config);
       logger.info("✅ Deploy de contexto concluído!");
     } catch (error: any) {
-      logger.error(`❌ Erro ao enviar contexto: ${error.responseData || error.response?.data || error.message}`);
+      logger.error("❌ Erro ao enviar contexto:", error.responseData || error.response?.data || error.message);
     }
   });
 
