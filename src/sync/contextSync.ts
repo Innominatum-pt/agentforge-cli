@@ -3,6 +3,7 @@ import path from "path";
 import FormData from "form-data";
 import * as tar from "tar";
 import { createGoclawClientFromConfig } from "../goclaw/client";
+import { logger } from "../core/logger";
 import {
   archiveContextNameToLogicalPath,
   memoryDocumentPathToFlatArchiveName,
@@ -96,7 +97,7 @@ export async function injectGhostPlaceholders(
       }
     }
   } catch (e: any) {
-    console.warn("Aviso: Falha ao procurar fantasmas para o tarball.", e.message);
+    logger.warn("Aviso: Falha ao procurar fantasmas para o tarball.", e.message);
   }
 }
 
@@ -124,7 +125,7 @@ export async function importContextArchive(
   const client = createGoclawClientFromConfig(config);
   await client.importAgentArchive(agentId, form, form.getHeaders(), sectionsArray);
 
-  console.log(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
+  logger.info(`✅ Upload de ficheiros e subpastas de contexto concluído com sucesso!`);
 }
 
 export async function cleanupContextSyncTempFiles(
