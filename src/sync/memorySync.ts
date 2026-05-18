@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { createGoclawClientFromConfig } from "../goclaw/client";
 import { localMemoryPathToFlatArchiveName } from "./pathMapping";
+import { logger } from "../core/logger";
 
 export async function forceUpdateLocalMemoryDocuments(
   agentId: string,
@@ -19,9 +20,9 @@ export async function forceUpdateLocalMemoryDocuments(
         const flatFileName = localMemoryPathToFlatArchiveName(localPath);
         const content = await fs.readFile(path.join(sectionDir, flatFileName), 'utf8');
         await client.updateMemoryDocument(agentId, localPath, { content });
-        console.log(`✅ Edição de memória forçada com sucesso: ${localPath}`);
+        logger.info(`✅ Edição de memória forçada com sucesso: ${localPath}`);
       } catch (putErr: any) {
-        console.warn(`⚠️ Aviso na edição de ${localPath}: O conteúdo pode não ter sido alterado. (${putErr.message})`);
+        logger.warn(`⚠️ Aviso na edição de ${localPath}: O conteúdo pode não ter sido alterado. (${putErr.message})`);
       }
     }
   }
@@ -44,7 +45,7 @@ export async function pruneOrphanMemoryDocuments(
       if (!doc.path) continue;
 
       if (!localFilePaths.includes(doc.path)) {
-        console.log(`🧹 Removendo memória órfã no servidor: ${doc.path}`);
+        logger.info(`🧹 Removendo memória órfã no servidor: ${doc.path}`);
 
         try {
           await client.deleteMemoryDocument(agentId, doc.path, {
@@ -55,17 +56,17 @@ export async function pruneOrphanMemoryDocuments(
           const status = delErr.status || delErr.response?.status;
           const errorData = delErr.responseData?.error || delErr.response?.data?.error || "";
           if (status === 500 && errorData.includes("not found")) {
-            console.log(`✅ ${doc.path} já estava removido da base de dados.`);
+            logger.info(`✅ ${doc.path} já estava removido da base de dados.`);
           } else {
-            console.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
+            logger.warn(`⚠️ Não foi possível apagar ${doc.path}: ${delErr.message}`);
           }
         }
       }
     }
     if (deletedCount > 0) {
-      console.log(`✅ Pruning concluído: ${deletedCount} ficheiro(s) apagado(s) do GoClaw.`);
+      logger.info(`✅ Pruning concluído: ${deletedCount} ficheiro(s) apagado(s) do GoClaw.`);
     }
   } catch (pruneErr: any) {
-    console.warn(`⚠️ Aviso: Falha ao fazer pruning das memórias: ${pruneErr.message}`);
+    logger.warn(`⚠️ Aviso: Falha ao fazer pruning das memórias: ${pruneErr.message}`);
   }
 }
