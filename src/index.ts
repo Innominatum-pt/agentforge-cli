@@ -843,22 +843,22 @@ pullCmd
     }
 
     // PULL AGENTS INLINE
-    console.log('\n--- [2/2] AGENTS ---');
+    logger.info('\n--- [2/2] AGENTS ---');
     try {
       const client = createGoclawClientFromConfig(config);
       const agents = await client.listAgents();
-      console.log(`Encontrados ${agents.length} agentes. Sincronizando...`);
+      logger.info(`Encontrados ${agents.length} agentes. Sincronizando...`);
 
       for (const agent of agents) {
         const slug = agent.agent_key;
         await pullAgent(slug, agent.id, config);
       }
-      console.log('✅ Pull de agentes concluído!');
+      logger.info('✅ Pull de agentes concluído!');
     } catch (error: any) {
-      console.error('❌ Erro durante o pull dos agentes:', error.message);
+      logger.error('❌ Erro durante o pull dos agentes:', error.message);
     }
-    
-    console.log('\n🚀 SYNC COMPLETO! Workspace atualizado.');
+
+    logger.info('\n🚀 SYNC COMPLETO! Workspace atualizado.');
   });
 
 program.parse();
