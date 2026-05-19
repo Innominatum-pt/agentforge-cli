@@ -8,15 +8,6 @@ import {
 describe("logger migration regression guard", () => {
   const indexSource = readIndexSource();
 
-  it("keeps getWorkspaceRoot on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "function getWorkspaceRoot(): string {",
-      "const program = new Command();"
-    );
-    expectNoDirectConsole(region);
-  });
-
   it("keeps init command on logger", () => {
     const region = sliceBetween(
       indexSource,
@@ -39,15 +30,6 @@ describe("logger migration regression guard", () => {
     const region = sliceBetween(
       indexSource,
       "const buildCmd = program",
-      "async function getConfig()"
-    );
-    expectNoDirectConsole(region);
-  });
-
-  it("keeps getConfig on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "async function getConfig()",
       "async function resolveAgentId"
     );
     expectNoDirectConsole(region);

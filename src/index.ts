@@ -7,11 +7,13 @@ import slugify from "slugify";
 import AdmZip from "adm-zip";
 import FormData from "form-data";
 import * as tar from "tar";
-import * as readline from "readline";
 import os from "os";
 import pkg from "../package.json";
 import { createGoclawClientFromConfig } from "./goclaw/client";
 import { logger } from "./core/logger";
+import { getWorkspaceRoot } from "./core/workspace";
+import { getConfig } from "./core/config";
+import { confirmOverwrite } from "./core/prompts";
 import {
   prepareContextFilesExport,
   injectGhostPlaceholders,
@@ -24,36 +26,6 @@ import {
   pruneOrphanMemoryDocuments,
 } from "./sync/memorySync";
 import { buildMemoryPathMap, reconstructExtractedContextFiles } from "./sync/pullAgentSync";
-
-function confirmOverwrite(entityType: string): Promise<boolean> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  return new Promise(resolve => {
-    rl.question(`⚠️ Atenção: O pull irá APAGAR as suas ${entityType} locais e substituí-las pelo estado do servidor. Quaisquer alterações ou entidades não publicadas serão PERDIDAS. Deseja continuar? (s/N) `, answer => {
-      rl.close();
-      const isYes = answer.toLowerCase() === 's' || answer.toLowerCase() === 'sim' || answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
-      resolve(isYes);
-    });
-  });
-}
-
-function getWorkspaceRoot(): string {
-  let dir = process.cwd();
-  while (dir !== path.parse(dir).root) {
-    if (fs.existsSync(path.join(dir, "agentforge.json")) || fs.existsSync(path.join(dir, "agentforge.yml"))) {
-      return dir;
-    }
-    dir = path.dirname(dir);
-  }
-  if (fs.existsSync(path.join(dir, "agentforge.json")) || fs.existsSync(path.join(dir, "agentforge.yml"))) {
-    return dir;
-  }
-  logger.error("❌ Erro: Não foi possível encontrar a raiz do workspace (agentforge.json). Certifique-se de estar dentro do projeto.");
-  process.exit(1);
-}
 
 const program = new Command();
 
@@ -297,20 +269,6 @@ buildCmd
 
     logger.info(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
   });
-
-async function getConfig() {
-  const root = getWorkspaceRoot();
-  const configPath = path.join(root, "agentforge.json");
-  if (!(await fs.pathExists(configPath))) {
-    logger.error("❌ Arquivo agentforge.json não encontrado. Execute 'agentforge init' primeiro.");
-    process.exit(1);
-  }
-  const config = await fs.readJson(configPath);
-  if (config.goclaw && config.goclaw.api_url) {
-    config.goclaw.api_url = config.goclaw.api_url.replace(/\/$/, "");
-  }
-  return config;
-}
 
 async function resolveAgentId(slug: string, config: any): Promise<string | null> {
   try {
