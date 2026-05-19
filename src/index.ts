@@ -14,6 +14,7 @@ import { logger } from "./core/logger";
 import { getWorkspaceRoot } from "./core/workspace";
 import { getConfig } from "./core/config";
 import { confirmOverwrite } from "./core/prompts";
+import { resolveAgentId } from "./core/agentResolution";
 import {
   prepareContextFilesExport,
   injectGhostPlaceholders,
@@ -270,16 +271,6 @@ buildCmd
     logger.info(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
   });
 
-async function resolveAgentId(slug: string, config: any): Promise<string | null> {
-  try {
-    const client = createGoclawClientFromConfig(config);
-    const agents = await client.listAgents();
-    const agent = agents.find((a: any) => a.agent_key === slug);
-    return agent ? agent.id : null;
-  } catch (error) {
-    return null;
-  }
-}
 
 const deployCmd = program
   .command("deploy")
