@@ -30,15 +30,6 @@ describe("logger migration regression guard", () => {
     const region = sliceBetween(
       indexSource,
       "const buildCmd = program",
-      "async function resolveAgentId"
-    );
-    expectNoDirectConsole(region);
-  });
-
-  it("keeps resolveAgentId on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "async function resolveAgentId",
       "const deployCmd = program"
     );
     expectNoDirectConsole(region);
