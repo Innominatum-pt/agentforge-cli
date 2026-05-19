@@ -5,6 +5,11 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const srcDir = path.join(repoRoot, "src");
 
+const ALLOWED_DIRECT_CONSOLE_FILES = [
+  path.join("src", "core", "logger.ts"),
+  path.join("src", "core", "logger.test.ts"),
+];
+
 function collectTsFiles(dir: string): string[] {
   const results: string[] = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -12,7 +17,7 @@ function collectTsFiles(dir: string): string[] {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...collectTsFiles(fullPath));
-    } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
+    } else if (entry.name.endsWith(".ts")) {
       results.push(fullPath);
     }
   }
@@ -21,7 +26,8 @@ function collectTsFiles(dir: string): string[] {
 
 describe("global console regression guard", () => {
   const files = collectTsFiles(srcDir).filter(
-    (f) => !f.includes(path.join("src", "core", "logger.ts"))
+    (f) =>
+      !ALLOWED_DIRECT_CONSOLE_FILES.some((allowed) => f.includes(allowed))
   );
 
   it("has source files to guard", () => {
