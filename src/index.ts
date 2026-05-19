@@ -15,6 +15,7 @@ import { getWorkspaceRoot } from "./core/workspace";
 import { getConfig } from "./core/config";
 import { confirmOverwrite } from "./core/prompts";
 import { resolveAgentId } from "./core/agentResolution";
+import { buildSkill } from "./commands/buildSkill";
 import {
   prepareContextFilesExport,
   injectGhostPlaceholders,
@@ -251,25 +252,7 @@ const buildCmd = program
 buildCmd
   .command("skill <slug>")
   .description("Empacota uma skill em um arquivo .zip na pasta exports/")
-  .action(async (slug: string) => {
-    const basePath = getWorkspaceRoot();
-    const skillPath = path.join(basePath, "skills", slug);
-    const exportsPath = path.join(basePath, "exports");
-    const zipPath = path.join(exportsPath, `${slug}.zip`);
-
-    if (!(await fs.pathExists(skillPath))) {
-      logger.error(`❌ A skill "${slug}" não foi encontrada em skills/${slug}.`);
-      process.exit(1);
-    }
-
-    await fs.ensureDir(exportsPath);
-
-    const zip = new AdmZip();
-    zip.addLocalFolder(skillPath, "");
-    zip.writeZip(zipPath);
-
-    logger.info(`✅ Build concluído: ${slug}.zip salvo na pasta exports/`);
-  });
+  .action(buildSkill);
 
 
 const deployCmd = program
