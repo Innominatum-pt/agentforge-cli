@@ -6,12 +6,8 @@ vi.mock("../core/config", () => ({
   getConfig: vi.fn(),
 }));
 
-vi.mock("../core/workspace", () => ({
-  getWorkspaceRoot: vi.fn(),
-}));
-
-vi.mock("./deploySkill", () => ({
-  deploySkill: vi.fn(),
+vi.mock("./runDeploySkill", () => ({
+  runDeploySkill: vi.fn(),
 }));
 
 vi.mock("./runDeployContext", () => ({
@@ -43,8 +39,7 @@ vi.mock("../core/logger", () => ({
 }));
 
 import { getConfig } from "../core/config";
-import { getWorkspaceRoot } from "../core/workspace";
-import { deploySkill } from "./deploySkill";
+import { runDeploySkill } from "./runDeploySkill";
 import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
 import { runDeployAgents } from "./runDeployAgents";
@@ -104,17 +99,14 @@ describe("registerDeployCommands", () => {
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 
-  it("deploy skill wrapper calls getWorkspaceRoot and deploySkill with correct args", async () => {
+  it("deploy skill wrapper calls runDeploySkill(slug, config)", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/workspace");
-    (deploySkill as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runDeploySkill as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const deployCmd = program.commands.find((c) => c.name() === "deploy")!;
     await deployCmd.parseAsync(["node", "script", "skill", "my-skill"]);
 
-    expect(getConfig).toHaveBeenCalled();
-    expect(getWorkspaceRoot).toHaveBeenCalled();
-    expect(deploySkill).toHaveBeenCalledWith("my-skill", { goclaw: { token: "t" } }, "/workspace");
+    expect(runDeploySkill).toHaveBeenCalledWith("my-skill", { goclaw: { token: "t" } });
   });
 
   it("deploy context wrapper calls runDeployContext(slug, config)", async () => {
