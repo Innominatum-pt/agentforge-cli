@@ -11,13 +11,13 @@ import { logger } from "./core/logger";
 import { getWorkspaceRoot } from "./core/workspace";
 import { getConfig } from "./core/config";
 import { confirmOverwrite } from "./core/prompts";
-import { resolveAgentId } from "./core/agentResolution";
 import { buildSkill } from "./commands/buildSkill";
 import { createNewAgent } from "./commands/newAgent";
 import { createNewSkill } from "./commands/newSkill";
 import { initWorkspace } from "./commands/initWorkspace";
 import { showManual } from "./commands/showManual";
 import { deploySkill } from "./commands/deploySkill";
+import { deployAgent } from "./commands/deployAgent";
 import { deployContextFiles } from "./commands/deployContextFiles";
 import { buildMemoryPathMap, reconstructExtractedContextFiles } from "./sync/pullAgentSync";
 
@@ -81,42 +81,6 @@ deployCmd
     const basePath = getWorkspaceRoot();
     await deploySkill(slug, config, basePath);
   });
-
-async function deployAgent(slug: string, config: any) {
-  const basePath = getWorkspaceRoot();
-  const agentPath = path.join(basePath, "agents", slug);
-  const agentJsonPath = path.join(agentPath, "agent.json");
-
-  if (!(await fs.pathExists(agentJsonPath))) {
-    logger.error(`❌ agent.json não encontrado em agents/${slug}.`);
-    return;
-  }
-
-  const agentConfig = await fs.readJson(agentJsonPath);
-  logger.info(`🚀 Sincronizando agente "${slug}"...`);
-
-  try {
-    const client = createGoclawClientFromConfig(config);
-    const agentId = await resolveAgentId(slug, config);
-    const exists = agentId !== null;
-
-    if (!exists) {
-      await client.createAgent(agentConfig);
-      logger.info(`✅ Agente "${slug}" criado.`);
-    } else {
-      await client.updateAgent(agentId, agentConfig);
-      logger.info(`✅ Configuração de "${slug}" atualizada.`);
-    }
-
-    await deployContextFiles(slug, config, agentId);
-    logger.info(`✅ Agente "${slug}" sincronizado com sucesso!`);
-  } catch (error: any) {
-    logger.error(
-      `❌ Erro no deploy de "${slug}":`,
-      error.responseData || error.response?.data || error.message
-    );
-  }
-}
 
 deployCmd
   .command("context <slug>")
