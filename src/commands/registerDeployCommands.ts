@@ -1,14 +1,12 @@
 import { Command } from "commander";
-import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
 import { getRequiredGoclawConfig, GoclawAuthMessages } from "../core/auth";
 import { deploySkill } from "./deploySkill";
 import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
-import { deployAllAgents } from "./deployAllAgents";
 import { runDeployAgents } from "./runDeployAgents";
-import { deployAllSkills } from "./deployAllSkills";
 import { runDeploySkills } from "./runDeploySkills";
+import { runDeployAll } from "./runDeployAll";
 
 export function registerDeployCommands(program: Command): void {
   const deployCmd = program
@@ -65,10 +63,6 @@ export function registerDeployCommands(program: Command): void {
     .action(async () => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingDeployToken);
 
-      const basePath = getWorkspaceRoot();
-      await deployAllAgents(config, basePath);
-      await deployAllSkills(config, basePath);
-
-      logger.info("🏁 Deploy completo (agentes e skills) concluído!");
+      await runDeployAll(config);
     });
 }
