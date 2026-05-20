@@ -3,7 +3,7 @@ import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
 import { getRequiredGoclawConfig, GoclawAuthMessages } from "../core/auth";
 import { deploySkill } from "./deploySkill";
-import { deployContextFiles } from "./deployContextFiles";
+import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
 import { deployAllAgents } from "./deployAllAgents";
 import { deployAllSkills } from "./deployAllSkills";
@@ -29,13 +29,7 @@ export function registerDeployCommands(program: Command): void {
     .action(async (slug: string) => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingDeployToken);
 
-      logger.info(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
-      try {
-        await deployContextFiles(slug, config);
-        logger.info("✅ Deploy de contexto concluído!");
-      } catch (error: any) {
-        logger.error("❌ Erro ao enviar contexto:", error.responseData || error.response?.data || error.message);
-      }
+      await runDeployContext(slug, config);
     });
 
   deployCmd
