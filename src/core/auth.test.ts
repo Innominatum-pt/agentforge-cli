@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { requireGoclawToken, getRequiredGoclawConfig } from "./auth";
+import { requireGoclawToken, getRequiredGoclawConfig, GoclawAuthMessages } from "./auth";
 
 vi.mock("./logger", () => ({
   logger: {
@@ -15,6 +15,26 @@ vi.mock("./config", () => ({
 
 import { logger } from "./logger";
 import { getConfig } from "./config";
+
+describe("GoclawAuthMessages", () => {
+  it("has exact missingDeployTokenBeforeDeploy message", () => {
+    expect(GoclawAuthMessages.missingDeployTokenBeforeDeploy).toBe(
+      "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy."
+    );
+  });
+
+  it("has exact missingDeployToken message", () => {
+    expect(GoclawAuthMessages.missingDeployToken).toBe(
+      "❌ Configure sua chave de API (token) no agentforge.json."
+    );
+  });
+
+  it("has exact missingPullToken message", () => {
+    expect(GoclawAuthMessages.missingPullToken).toBe(
+      "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull."
+    );
+  });
+});
 
 describe("requireGoclawToken", () => {
   let mockExit: any;
