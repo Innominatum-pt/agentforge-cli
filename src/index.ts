@@ -18,6 +18,7 @@ import { buildSkill } from "./commands/buildSkill";
 import { createNewAgent } from "./commands/newAgent";
 import { createNewSkill } from "./commands/newSkill";
 import { initWorkspace } from "./commands/initWorkspace";
+import { showManual } from "./commands/showManual";
 import {
   prepareContextFilesExport,
   injectGhostPlaceholders,
@@ -52,15 +53,7 @@ program
   .command("manual")
   .alias("help-docs")
   .description("Exibe o manual completo de uso da AgentForge CLI")
-  .action(async () => {
-    const cliManualPath = path.join(__dirname, "../templates/CLI_MANUAL.md");
-    if (await fs.pathExists(cliManualPath)) {
-      const content = await fs.readFile(cliManualPath, "utf-8");
-      logger.raw(content);
-    } else {
-      logger.error("❌ Manual não encontrado.");
-    }
-  });
+  .action(showManual);
 
 newCmd
   .command("agent <name>")
