@@ -1,8 +1,7 @@
 import { Command } from "commander";
 import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
-import { getConfig } from "../core/config";
-import { requireGoclawToken } from "../core/auth";
+import { getRequiredGoclawConfig } from "../core/auth";
 import { deploySkill } from "./deploySkill";
 import { deployContextFiles } from "./deployContextFiles";
 import { deployAgent } from "./deployAgent";
@@ -18,8 +17,7 @@ export function registerDeployCommands(program: Command): void {
     .command("skill <slug>")
     .description("Faz build e upload automático de uma skill para o GoClaw")
     .action(async (slug: string) => {
-      const config = await getConfig();
-      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
+      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
 
       const basePath = getWorkspaceRoot();
       await deploySkill(slug, config, basePath);
@@ -29,8 +27,7 @@ export function registerDeployCommands(program: Command): void {
     .command("context <slug>")
     .description("Faz upload dos arquivos de contexto diretamente para o agente usando a API de importação")
     .action(async (slug: string) => {
-      const config = await getConfig();
-      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
+      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json.");
 
       logger.info(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
       try {
@@ -45,8 +42,7 @@ export function registerDeployCommands(program: Command): void {
     .command("agent <slug>")
     .description("Faz deploy completo do agente (configuração + arquivos de contexto)")
     .action(async (slug: string) => {
-      const config = await getConfig();
-      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
+      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json.");
 
       await deployAgent(slug, config);
     });
@@ -55,8 +51,7 @@ export function registerDeployCommands(program: Command): void {
     .command("agents")
     .description("Faz deploy de todos os agentes do workspace")
     .action(async () => {
-      const config = await getConfig();
-      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
+      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json.");
       const basePath = getWorkspaceRoot();
       await deployAllAgents(config, basePath);
       logger.info("🏁 Deploy de agentes concluído!");
@@ -66,8 +61,7 @@ export function registerDeployCommands(program: Command): void {
     .command("skills")
     .description("Faz deploy de todas as skills do workspace")
     .action(async () => {
-      const config = await getConfig();
-      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
+      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json.");
       const basePath = getWorkspaceRoot();
       await deployAllSkills(config, basePath);
       logger.info("🏁 Deploy de skills concluído!");
@@ -77,8 +71,7 @@ export function registerDeployCommands(program: Command): void {
     .command("all")
     .description("Faz deploy de todos os agentes e skills do workspace")
     .action(async () => {
-      const config = await getConfig();
-      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
+      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json.");
 
       const basePath = getWorkspaceRoot();
       await deployAllAgents(config, basePath);

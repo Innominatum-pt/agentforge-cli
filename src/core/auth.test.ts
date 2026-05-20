@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { requireGoclawToken } from "./auth";
+import { requireGoclawToken, getRequiredGoclawConfig } from "./auth";
 
 vi.mock("./logger", () => ({
   logger: {
@@ -9,7 +9,12 @@ vi.mock("./logger", () => ({
   },
 }));
 
+vi.mock("./config", () => ({
+  getConfig: vi.fn(),
+}));
+
 import { logger } from "./logger";
+import { getConfig } from "./config";
 
 describe("requireGoclawToken", () => {
   let mockExit: any;
@@ -65,6 +70,62 @@ describe("requireGoclawToken", () => {
     expect(() =>
       requireGoclawToken({ goclaw: {} }, msg)
     ).toThrow("process.exit");
+
+    expect(logger.error).toHaveBeenCalledWith(msg);
+  });
+});
+
+describe("getRequiredGoclawConfig", () => {
+  let mockExit: any;
+
+  beforeEach(() => {
+    mockExit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit");
+    }) as any);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    mockExit.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  it("calls getConfig", async () => {
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
+    await getRequiredGoclawConfig("msg");
+    expect(getConfig).toHaveBeenCalled();
+  });
+
+  it("returns the config when token exists", async () => {
+    const config = { goclaw: { token: "t" } };
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue(config);
+    const result = await getRequiredGoclawConfig("msg");
+    expect(result).toBe(config);
+  });
+
+  it("logs the exact provided message and exits when token is missing", async () => {
+    const msg = "❌ Custom missing token message";
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: {} });
+
+    await expect(getRequiredGoclawConfig(msg)).rejects.toThrow("process.exit");
+
+    expect(logger.error).toHaveBeenCalledWith(msg);
+    expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  it("preserves process.exit(1) behaviour", async () => {
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    await expect(getRequiredGoclawConfig("msg")).rejects.toThrow("process.exit");
+
+    expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  it("preserves message passthrough exactly", async () => {
+    const msg = "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.";
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: {} });
+
+    await expect(getRequiredGoclawConfig(msg)).rejects.toThrow("process.exit");
 
     expect(logger.error).toHaveBeenCalledWith(msg);
   });
