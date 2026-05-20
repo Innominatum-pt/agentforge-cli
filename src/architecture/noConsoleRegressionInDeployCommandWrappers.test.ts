@@ -12,7 +12,7 @@ describe("logger migration regression guard for deploy command wrappers", () => 
     const region = sliceBetween(
       indexSource,
       'deployCmd\n  .command("skill <slug>")',
-      "async function deployContextFiles"
+      "async function deployAgent"
     );
     expectNoDirectConsole(region);
   });
