@@ -4,6 +4,7 @@ import path from "path";
 import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
 import { getConfig } from "../core/config";
+import { requireGoclawToken } from "../core/auth";
 import { confirmOverwrite } from "../core/prompts";
 import { pullAllSkills } from "./pullAllSkills";
 import { pullAllAgents } from "./pullAllAgents";
@@ -18,10 +19,7 @@ export function registerPullCommands(program: Command): void {
     .description("Faz download do arquivo tar.gz de skills do GoClaw e extrai localmente")
     .action(async () => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
 
       if (!(await confirmOverwrite("skills"))) {
         logger.info("❌ Pull cancelado pelo utilizador.");
@@ -46,10 +44,7 @@ export function registerPullCommands(program: Command): void {
     .description("Faz download cirúrgico dos agentes (configuração e contexto)")
     .action(async () => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
 
       if (!(await confirmOverwrite("agentes"))) {
         logger.info("❌ Pull cancelado pelo utilizador.");
@@ -76,10 +71,7 @@ export function registerPullCommands(program: Command): void {
     .description('Faz download cirúrgico de todos os agentes e skills do GoClaw para a pasta local')
     .action(async () => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error('❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.');
-        process.exit(1);
-      }
+      requireGoclawToken(config, '❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.');
 
       if (!(await confirmOverwrite('TUDO (agentes e skills)'))) {
         logger.info('❌ Pull cancelado pelo utilizador.');

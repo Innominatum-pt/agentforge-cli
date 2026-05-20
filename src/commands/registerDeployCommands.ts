@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
 import { getConfig } from "../core/config";
+import { requireGoclawToken } from "../core/auth";
 import { deploySkill } from "./deploySkill";
 import { deployContextFiles } from "./deployContextFiles";
 import { deployAgent } from "./deployAgent";
@@ -18,10 +19,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz build e upload automático de uma skill para o GoClaw")
     .action(async (slug: string) => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json antes de fazer o deploy.");
 
       const basePath = getWorkspaceRoot();
       await deploySkill(slug, config, basePath);
@@ -32,10 +30,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz upload dos arquivos de contexto diretamente para o agente usando a API de importação")
     .action(async (slug: string) => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
 
       logger.info(`🚀 Sincronizando arquivos de contexto do agente "${slug}"...`);
       try {
@@ -51,10 +46,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz deploy completo do agente (configuração + arquivos de contexto)")
     .action(async (slug: string) => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
 
       await deployAgent(slug, config);
     });
@@ -64,10 +56,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz deploy de todos os agentes do workspace")
     .action(async () => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
       const basePath = getWorkspaceRoot();
       await deployAllAgents(config, basePath);
       logger.info("🏁 Deploy de agentes concluído!");
@@ -78,10 +67,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz deploy de todas as skills do workspace")
     .action(async () => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
       const basePath = getWorkspaceRoot();
       await deployAllSkills(config, basePath);
       logger.info("🏁 Deploy de skills concluído!");
@@ -92,10 +78,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz deploy de todos os agentes e skills do workspace")
     .action(async () => {
       const config = await getConfig();
-      if (!config.goclaw || !config.goclaw.token) {
-        logger.error("❌ Configure sua chave de API (token) no agentforge.json.");
-        process.exit(1);
-      }
+      requireGoclawToken(config, "❌ Configure sua chave de API (token) no agentforge.json.");
 
       const basePath = getWorkspaceRoot();
       await deployAllAgents(config, basePath);
