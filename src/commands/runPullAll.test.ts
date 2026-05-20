@@ -9,17 +9,17 @@ vi.mock("../core/logger", () => ({
   },
 }));
 
-vi.mock("./pullAllSkills", () => ({
-  pullAllSkills: vi.fn(),
+vi.mock("./runPullSkills", () => ({
+  runPullSkills: vi.fn(),
 }));
 
-vi.mock("./pullAllAgents", () => ({
-  pullAllAgents: vi.fn(),
+vi.mock("./runPullAgents", () => ({
+  runPullAgents: vi.fn(),
 }));
 
 import { logger } from "../core/logger";
-import { pullAllSkills } from "./pullAllSkills";
-import { pullAllAgents } from "./pullAllAgents";
+import { runPullSkills } from "./runPullSkills";
+import { runPullAgents } from "./runPullAgents";
 
 describe("runPullAll", () => {
   const config = { goclaw: { token: "t" } };
@@ -28,9 +28,9 @@ describe("runPullAll", () => {
     vi.clearAllMocks();
   });
 
-  it("logs start message", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  it("logs full sync start message", async () => {
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
@@ -40,115 +40,68 @@ describe("runPullAll", () => {
   });
 
   it("logs skills section header", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
     expect(logger.info).toHaveBeenCalledWith("\n--- [1/2] SKILLS ---");
   });
 
-  it("calls pullAllSkills(config)", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  it("calls runPullSkills(config)", async () => {
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
-    expect(pullAllSkills).toHaveBeenCalledWith(config);
-  });
-
-  it("logs skills success when pullAllSkills succeeds", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-
-    await runPullAll(config);
-
-    expect(logger.info).toHaveBeenCalledWith("✅ Pull de skills concluído!");
-  });
-
-  it("logs skills error on pullAllSkills failure without throwing", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("network down")
-    );
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-
-    await expect(runPullAll(config)).resolves.toBeUndefined();
-
-    expect(logger.error).toHaveBeenCalledWith(
-      "❌ Erro durante o pull das skills:",
-      "network down"
-    );
-  });
-
-  it("still runs pullAllAgents after skills failure", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("network down")
-    );
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-
-    await runPullAll(config);
-
-    expect(pullAllAgents).toHaveBeenCalledWith(config);
+    expect(runPullSkills).toHaveBeenCalledWith(config);
   });
 
   it("logs agents section header", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
     expect(logger.info).toHaveBeenCalledWith("\n--- [2/2] AGENTS ---");
   });
 
-  it("calls pullAllAgents(config)", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  it("calls runPullAgents(config)", async () => {
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
-    expect(pullAllAgents).toHaveBeenCalledWith(config);
+    expect(runPullAgents).toHaveBeenCalledWith(config);
   });
 
-  it("logs agents success when pullAllAgents succeeds", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+  it("calls runPullSkills before runPullAgents", async () => {
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
-    expect(logger.info).toHaveBeenCalledWith("✅ Pull de agentes concluído!");
-  });
-
-  it("logs agents error on pullAllAgents failure without throwing", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("auth failed")
-    );
-
-    await expect(runPullAll(config)).resolves.toBeUndefined();
-
-    expect(logger.error).toHaveBeenCalledWith(
-      "❌ Erro durante o pull dos agentes:",
-      "auth failed"
-    );
-  });
-
-  it("calls pullAllSkills before pullAllAgents", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-
-    await runPullAll(config);
-
-    expect(pullAllSkills).toHaveBeenCalledBefore(pullAllAgents as any);
+    expect(runPullSkills).toHaveBeenCalledBefore(runPullAgents as any);
   });
 
   it("logs final sync message", async () => {
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     await runPullAll(config);
 
     expect(logger.info).toHaveBeenCalledWith(
       "\n🚀 SYNC COMPLETO! Workspace atualizado."
     );
+  });
+
+  it("does not call pullAllSkills or pullAllAgents directly", async () => {
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+    await runPullAll(config);
+
+    expect(runPullSkills).toHaveBeenCalledWith(config);
+    expect(runPullAgents).toHaveBeenCalledWith(config);
   });
 });
