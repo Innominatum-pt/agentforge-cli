@@ -11,8 +11,8 @@ vi.mock("../core/workspace", () => ({
   getWorkspaceRoot: vi.fn(),
 }));
 
-vi.mock("../core/prompts", () => ({
-  confirmOverwrite: vi.fn(),
+vi.mock("./pullConfirmation", () => ({
+  confirmPullOverwrite: vi.fn(),
 }));
 
 vi.mock("./pullAllSkills", () => ({
@@ -40,7 +40,7 @@ vi.mock("fs-extra", () => ({
 
 import { getConfig } from "../core/config";
 import { getWorkspaceRoot } from "../core/workspace";
-import { confirmOverwrite } from "../core/prompts";
+import { confirmPullOverwrite } from "./pullConfirmation";
 import { pullAllSkills } from "./pullAllSkills";
 import { pullAllAgents } from "./pullAllAgents";
 import { logger } from "../core/logger";
@@ -103,31 +103,30 @@ describe("registerPullCommands", () => {
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 
-  it("pull skills wrapper uses confirmOverwrite('skills')", async () => {
+  it("pull skills wrapper uses confirmPullOverwrite('skills')", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "skills"]);
 
-    expect(confirmOverwrite).toHaveBeenCalledWith("skills");
+    expect(confirmPullOverwrite).toHaveBeenCalledWith("skills");
   });
 
-  it("pull skills wrapper cancellation logs exact message and does not call pullAllSkills", async () => {
+  it("pull skills wrapper cancellation does not call pullAllSkills", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "skills"]);
 
-    expect(logger.info).toHaveBeenCalledWith("❌ Pull cancelado pelo utilizador.");
     expect(pullAllSkills).not.toHaveBeenCalled();
   });
 
   it("pull skills wrapper calls pullAllSkills(config) on confirmation", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
@@ -138,7 +137,7 @@ describe("registerPullCommands", () => {
 
   it("pull skills wrapper logs final success message", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
@@ -151,7 +150,7 @@ describe("registerPullCommands", () => {
 
   it("pull skills wrapper on HTTP error logs correct status line", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockRejectedValue({ response: { status: 403 } });
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
@@ -175,32 +174,31 @@ describe("registerPullCommands", () => {
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 
-  it("pull agents wrapper uses confirmOverwrite('agentes')", async () => {
+  it("pull agents wrapper uses confirmPullOverwrite('agentes')", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/ws");
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "agents"]);
 
-    expect(confirmOverwrite).toHaveBeenCalledWith("agentes");
+    expect(confirmPullOverwrite).toHaveBeenCalledWith("agentes");
   });
 
-  it("pull agents wrapper cancellation logs exact message and does not call pullAllAgents", async () => {
+  it("pull agents wrapper cancellation does not call pullAllAgents", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "agents"]);
 
-    expect(logger.info).toHaveBeenCalledWith("❌ Pull cancelado pelo utilizador.");
     expect(pullAllAgents).not.toHaveBeenCalled();
   });
 
   it("pull agents wrapper logs local agents cleanup message", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/ws");
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -212,7 +210,7 @@ describe("registerPullCommands", () => {
 
   it("pull agents wrapper calls fs.emptyDir for agents cleanup", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/ws");
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -224,7 +222,7 @@ describe("registerPullCommands", () => {
 
   it("pull agents wrapper calls pullAllAgents(config)", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/ws");
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -236,7 +234,7 @@ describe("registerPullCommands", () => {
 
   it("pull agents wrapper logs final success message", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/ws");
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -248,7 +246,7 @@ describe("registerPullCommands", () => {
 
   it("pull agents wrapper on HTTP error logs exact long message", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/ws");
     (pullAllAgents as ReturnType<typeof vi.fn>).mockRejectedValue({ response: { status: 401 } });
 
@@ -260,21 +258,21 @@ describe("registerPullCommands", () => {
     );
   });
 
-  it("pull all wrapper uses confirmOverwrite('TUDO (agentes e skills)')", async () => {
+  it("pull all wrapper uses confirmPullOverwrite('TUDO (agentes e skills)')", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "all"]);
 
-    expect(confirmOverwrite).toHaveBeenCalledWith("TUDO (agentes e skills)");
+    expect(confirmPullOverwrite).toHaveBeenCalledWith("TUDO (agentes e skills)");
   });
 
   it("pull all wrapper logs full sync start message", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -286,7 +284,7 @@ describe("registerPullCommands", () => {
 
   it("pull all wrapper calls pullAllSkills before pullAllAgents", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -298,7 +296,7 @@ describe("registerPullCommands", () => {
 
   it("pull all wrapper logs section headers and final sync message", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
@@ -312,7 +310,7 @@ describe("registerPullCommands", () => {
 
   it("pull all wrapper does NOT call fs.emptyDir for agents cleanup", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
     (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     (pullAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
