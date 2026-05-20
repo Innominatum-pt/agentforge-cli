@@ -14,8 +14,8 @@ vi.mock("./deploySkill", () => ({
   deploySkill: vi.fn(),
 }));
 
-vi.mock("./deployContextFiles", () => ({
-  deployContextFiles: vi.fn(),
+vi.mock("./runDeployContext", () => ({
+  runDeployContext: vi.fn(),
 }));
 
 vi.mock("./deployAgent", () => ({
@@ -41,7 +41,7 @@ vi.mock("../core/logger", () => ({
 import { getConfig } from "../core/config";
 import { getWorkspaceRoot } from "../core/workspace";
 import { deploySkill } from "./deploySkill";
-import { deployContextFiles } from "./deployContextFiles";
+import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
 import { deployAllAgents } from "./deployAllAgents";
 import { deployAllSkills } from "./deployAllSkills";
@@ -112,28 +112,14 @@ describe("registerDeployCommands", () => {
     expect(deploySkill).toHaveBeenCalledWith("my-skill", { goclaw: { token: "t" } }, "/workspace");
   });
 
-  it("deploy context wrapper logs start message and calls deployContextFiles", async () => {
+  it("deploy context wrapper calls runDeployContext(slug, config)", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (deployContextFiles as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runDeployContext as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const deployCmd = program.commands.find((c) => c.name() === "deploy")!;
     await deployCmd.parseAsync(["node", "script", "context", "my-agent"]);
 
-    expect(logger.info).toHaveBeenCalledWith(
-      `🚀 Sincronizando arquivos de contexto do agente "my-agent"...`
-    );
-    expect(deployContextFiles).toHaveBeenCalledWith("my-agent", { goclaw: { token: "t" } });
-    expect(logger.info).toHaveBeenCalledWith("✅ Deploy de contexto concluído!");
-  });
-
-  it("deploy context wrapper logs error on catch with correct semantics", async () => {
-    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (deployContextFiles as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("ctx fail"));
-
-    const deployCmd = program.commands.find((c) => c.name() === "deploy")!;
-    await deployCmd.parseAsync(["node", "script", "context", "my-agent"]);
-
-    expect(logger.error).toHaveBeenCalledWith("❌ Erro ao enviar contexto:", "ctx fail");
+    expect(runDeployContext).toHaveBeenCalledWith("my-agent", { goclaw: { token: "t" } });
   });
 
   it("deploy agent wrapper calls deployAgent with slug and config", async () => {
