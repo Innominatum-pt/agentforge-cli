@@ -1,7 +1,6 @@
 import { Command } from "commander";
-import { getWorkspaceRoot } from "../core/workspace";
 import { getRequiredGoclawConfig, GoclawAuthMessages } from "../core/auth";
-import { deploySkill } from "./deploySkill";
+import { runDeploySkill } from "./runDeploySkill";
 import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
 import { runDeployAgents } from "./runDeployAgents";
@@ -19,8 +18,7 @@ export function registerDeployCommands(program: Command): void {
     .action(async (slug: string) => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingDeployTokenBeforeDeploy);
 
-      const basePath = getWorkspaceRoot();
-      await deploySkill(slug, config, basePath);
+      await runDeploySkill(slug, config);
     });
 
   deployCmd
