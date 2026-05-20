@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "path";
 import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
-import { getRequiredGoclawConfig } from "../core/auth";
+import { getRequiredGoclawConfig, GoclawAuthMessages } from "../core/auth";
 import { confirmOverwrite } from "../core/prompts";
 import { pullAllSkills } from "./pullAllSkills";
 import { pullAllAgents } from "./pullAllAgents";
@@ -17,7 +17,7 @@ export function registerPullCommands(program: Command): void {
     .command("skills")
     .description("Faz download do arquivo tar.gz de skills do GoClaw e extrai localmente")
     .action(async () => {
-      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
+      const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingPullToken);
 
       if (!(await confirmOverwrite("skills"))) {
         logger.info("❌ Pull cancelado pelo utilizador.");
@@ -41,7 +41,7 @@ export function registerPullCommands(program: Command): void {
     .command("agents")
     .description("Faz download cirúrgico dos agentes (configuração e contexto)")
     .action(async () => {
-      const config = await getRequiredGoclawConfig("❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.");
+      const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingPullToken);
 
       if (!(await confirmOverwrite("agentes"))) {
         logger.info("❌ Pull cancelado pelo utilizador.");
@@ -67,7 +67,7 @@ export function registerPullCommands(program: Command): void {
     .command('all')
     .description('Faz download cirúrgico de todos os agentes e skills do GoClaw para a pasta local')
     .action(async () => {
-      const config = await getRequiredGoclawConfig('❌ Configure sua chave de API (token) no agentforge.json antes de fazer o pull.');
+      const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingPullToken);
 
       if (!(await confirmOverwrite('TUDO (agentes e skills)'))) {
         logger.info('❌ Pull cancelado pelo utilizador.');
