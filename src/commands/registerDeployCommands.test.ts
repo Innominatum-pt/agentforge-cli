@@ -26,6 +26,10 @@ vi.mock("./deployAllAgents", () => ({
   deployAllAgents: vi.fn(),
 }));
 
+vi.mock("./runDeployAgents", () => ({
+  runDeployAgents: vi.fn(),
+}));
+
 vi.mock("./deployAllSkills", () => ({
   deployAllSkills: vi.fn(),
 }));
@@ -44,6 +48,7 @@ import { deploySkill } from "./deploySkill";
 import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
 import { deployAllAgents } from "./deployAllAgents";
+import { runDeployAgents } from "./runDeployAgents";
 import { deployAllSkills } from "./deployAllSkills";
 import { logger } from "../core/logger";
 
@@ -130,6 +135,16 @@ describe("registerDeployCommands", () => {
     await deployCmd.parseAsync(["node", "script", "agent", "my-agent"]);
 
     expect(deployAgent).toHaveBeenCalledWith("my-agent", { goclaw: { token: "t" } });
+  });
+
+  it("deploy agents wrapper calls runDeployAgents(config)", async () => {
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
+    (runDeployAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+    const deployCmd = program.commands.find((c) => c.name() === "deploy")!;
+    await deployCmd.parseAsync(["node", "script", "agents"]);
+
+    expect(runDeployAgents).toHaveBeenCalledWith({ goclaw: { token: "t" } });
   });
 
   it("deploy all wrapper calls deployAllAgents then deployAllSkills", async () => {

@@ -6,6 +6,7 @@ import { deploySkill } from "./deploySkill";
 import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
 import { deployAllAgents } from "./deployAllAgents";
+import { runDeployAgents } from "./runDeployAgents";
 import { deployAllSkills } from "./deployAllSkills";
 
 export function registerDeployCommands(program: Command): void {
@@ -46,9 +47,7 @@ export function registerDeployCommands(program: Command): void {
     .description("Faz deploy de todos os agentes do workspace")
     .action(async () => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingDeployToken);
-      const basePath = getWorkspaceRoot();
-      await deployAllAgents(config, basePath);
-      logger.info("🏁 Deploy de agentes concluído!");
+      await runDeployAgents(config);
     });
 
   deployCmd
