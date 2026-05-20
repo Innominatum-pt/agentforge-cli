@@ -1,37 +1,13 @@
 import { describe, it } from "vitest";
 import {
   expectNoDirectConsole,
-  readIndexSource,
-  sliceBetween,
+  readSourceFile,
 } from "./architectureTestUtils";
 
 describe("logger migration regression guard", () => {
-  const indexSource = readIndexSource();
+  const coreSource = readSourceFile("src/commands/registerCoreCommands.ts");
 
-  it("keeps init command on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      'program\n  .command("init")',
-      "const newCmd = program"
-    );
-    expectNoDirectConsole(region);
-  });
-
-  it("keeps manual and new commands on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "const newCmd = program",
-      "const buildCmd = program"
-    );
-    expectNoDirectConsole(region);
-  });
-
-  it("keeps build command on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "const buildCmd = program",
-      "registerDeployCommands(program);"
-    );
-    expectNoDirectConsole(region);
+  it("keeps core command registration on logger", () => {
+    expectNoDirectConsole(coreSource);
   });
 });
