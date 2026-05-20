@@ -1,20 +1,13 @@
 import { describe, it } from "vitest";
 import {
   expectNoDirectConsole,
-  readIndexSource,
-  sliceBetween,
+  readSourceFile,
 } from "./architectureTestUtils";
 
 describe("logger migration regression guard for deployAgent", () => {
-  const indexSource = readIndexSource();
+  const deployAgentSource = readSourceFile("src/commands/deployAgent.ts");
 
   it("keeps deployAgent on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "async function deployAgent",
-      'deployCmd\n  .command("context <slug>")'
-    );
-
-    expectNoDirectConsole(region);
+    expectNoDirectConsole(deployAgentSource);
   });
 });
