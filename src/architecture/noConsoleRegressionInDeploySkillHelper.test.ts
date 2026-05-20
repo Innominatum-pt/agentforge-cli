@@ -1,20 +1,13 @@
 import { describe, it } from "vitest";
 import {
   expectNoDirectConsole,
-  readIndexSource,
-  sliceBetween,
+  readSourceFile,
 } from "./architectureTestUtils";
 
 describe("logger migration regression guard for deploySkill", () => {
-  const indexSource = readIndexSource();
+  const deploySkillSource = readSourceFile("src/commands/deploySkill.ts");
 
   it("keeps deploySkill on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "async function deploySkill",
-      'deployCmd\n  .command("skill <slug>")'
-    );
-
-    expectNoDirectConsole(region);
+    expectNoDirectConsole(deploySkillSource);
   });
 });
