@@ -22,10 +22,6 @@ vi.mock("./deployAgent", () => ({
   deployAgent: vi.fn(),
 }));
 
-vi.mock("./deployAllAgents", () => ({
-  deployAllAgents: vi.fn(),
-}));
-
 vi.mock("./runDeployAgents", () => ({
   runDeployAgents: vi.fn(),
 }));
@@ -34,8 +30,8 @@ vi.mock("./runDeploySkills", () => ({
   runDeploySkills: vi.fn(),
 }));
 
-vi.mock("./deployAllSkills", () => ({
-  deployAllSkills: vi.fn(),
+vi.mock("./runDeployAll", () => ({
+  runDeployAll: vi.fn(),
 }));
 
 vi.mock("../core/logger", () => ({
@@ -51,10 +47,9 @@ import { getWorkspaceRoot } from "../core/workspace";
 import { deploySkill } from "./deploySkill";
 import { runDeployContext } from "./runDeployContext";
 import { deployAgent } from "./deployAgent";
-import { deployAllAgents } from "./deployAllAgents";
 import { runDeployAgents } from "./runDeployAgents";
-import { deployAllSkills } from "./deployAllSkills";
 import { runDeploySkills } from "./runDeploySkills";
+import { runDeployAll } from "./runDeployAll";
 import { logger } from "../core/logger";
 
 describe("registerDeployCommands", () => {
@@ -162,18 +157,13 @@ describe("registerDeployCommands", () => {
     expect(runDeploySkills).toHaveBeenCalledWith({ goclaw: { token: "t" } });
   });
 
-  it("deploy all wrapper calls deployAllAgents then deployAllSkills", async () => {
+  it("deploy all wrapper calls runDeployAll(config)", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (getWorkspaceRoot as ReturnType<typeof vi.fn>).mockReturnValue("/workspace");
-    (deployAllAgents as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (deployAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runDeployAll as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const deployCmd = program.commands.find((c) => c.name() === "deploy")!;
     await deployCmd.parseAsync(["node", "script", "all"]);
 
-    expect(deployAllAgents).toHaveBeenCalledWith({ goclaw: { token: "t" } }, "/workspace");
-    expect(deployAllSkills).toHaveBeenCalledWith({ goclaw: { token: "t" } }, "/workspace");
-    expect(deployAllAgents).toHaveBeenCalledBefore(deployAllSkills as any);
-    expect(logger.info).toHaveBeenCalledWith("🏁 Deploy completo (agentes e skills) concluído!");
+    expect(runDeployAll).toHaveBeenCalledWith({ goclaw: { token: "t" } });
   });
 });
