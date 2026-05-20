@@ -1,28 +1,18 @@
 import { describe, it } from "vitest";
 import {
   expectNoDirectConsole,
-  readIndexSource,
-  sliceBetween,
+  readSourceFile,
 } from "./architectureTestUtils";
 
 describe("logger migration regression guard for deploy batch helpers", () => {
-  const indexSource = readIndexSource();
+  const deployAllAgentsSource = readSourceFile("src/commands/deployAllAgents.ts");
+  const deployAllSkillsSource = readSourceFile("src/commands/deployAllSkills.ts");
 
   it("keeps deployAllAgents on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "async function deployAllAgents",
-      "async function deployAllSkills"
-    );
-    expectNoDirectConsole(region);
+    expectNoDirectConsole(deployAllAgentsSource);
   });
 
   it("keeps deployAllSkills on logger", () => {
-    const region = sliceBetween(
-      indexSource,
-      "async function deployAllSkills",
-      'deployCmd\n  .command("agents")'
-    );
-    expectNoDirectConsole(region);
+    expectNoDirectConsole(deployAllSkillsSource);
   });
 });
