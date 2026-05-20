@@ -4,7 +4,6 @@ import { Command } from "commander";
 import fs from "fs-extra";
 import path from "path";
 import pkg from "../package.json";
-import { createGoclawClientFromConfig } from "./goclaw/client";
 import { logger } from "./core/logger";
 import { getWorkspaceRoot } from "./core/workspace";
 import { getConfig } from "./core/config";
@@ -17,6 +16,7 @@ import { showManual } from "./commands/showManual";
 import { registerDeployCommands } from "./commands/registerDeployCommands";
 import { pullAgent } from "./commands/pullAgent";
 import { pullAllSkills } from "./commands/pullAllSkills";
+import { pullAllAgents } from "./commands/pullAllAgents";
 
 const program = new Command();
 
@@ -113,17 +113,8 @@ pullCmd
     logger.info("🧹 Limpando a pasta local de agentes...");
     await fs.emptyDir(path.join(getWorkspaceRoot(), "agents"));
 
-    logger.info("📥 Buscando lista de agentes do GoClaw...");
     try {
-      const client = createGoclawClientFromConfig(config);
-      const agents = await client.listAgents();
-      logger.info(`Encontrados ${agents.length} agentes. Sincronizando...`);
-
-      for (const agent of agents) {
-        const slug = agent.agent_key;
-        await pullAgent(slug, agent.id, config);
-      }
-
+      await pullAllAgents(config);
       logger.info("✅ Pull de agentes concluído com sucesso!");
     } catch (error: any) {
       if (error.response?.status || error.status) {
@@ -164,14 +155,7 @@ pullCmd
     // PULL AGENTS INLINE
     logger.info('\n--- [2/2] AGENTS ---');
     try {
-      const client = createGoclawClientFromConfig(config);
-      const agents = await client.listAgents();
-      logger.info(`Encontrados ${agents.length} agentes. Sincronizando...`);
-
-      for (const agent of agents) {
-        const slug = agent.agent_key;
-        await pullAgent(slug, agent.id, config);
-      }
+      await pullAllAgents(config);
       logger.info('✅ Pull de agentes concluído!');
     } catch (error: any) {
       logger.error('❌ Erro durante o pull dos agentes:', error.message);
