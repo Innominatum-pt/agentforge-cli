@@ -4,7 +4,7 @@ import path from "path";
 import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
 import { getRequiredGoclawConfig, GoclawAuthMessages } from "../core/auth";
-import { confirmOverwrite } from "../core/prompts";
+import { confirmPullOverwrite } from "./pullConfirmation";
 import { pullAllSkills } from "./pullAllSkills";
 import { pullAllAgents } from "./pullAllAgents";
 
@@ -19,8 +19,7 @@ export function registerPullCommands(program: Command): void {
     .action(async () => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingPullToken);
 
-      if (!(await confirmOverwrite("skills"))) {
-        logger.info("❌ Pull cancelado pelo utilizador.");
+      if (!(await confirmPullOverwrite("skills"))) {
         return;
       }
 
@@ -43,8 +42,7 @@ export function registerPullCommands(program: Command): void {
     .action(async () => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingPullToken);
 
-      if (!(await confirmOverwrite("agentes"))) {
-        logger.info("❌ Pull cancelado pelo utilizador.");
+      if (!(await confirmPullOverwrite("agentes"))) {
         return;
       }
 
@@ -69,8 +67,7 @@ export function registerPullCommands(program: Command): void {
     .action(async () => {
       const config = await getRequiredGoclawConfig(GoclawAuthMessages.missingPullToken);
 
-      if (!(await confirmOverwrite('TUDO (agentes e skills)'))) {
-        logger.info('❌ Pull cancelado pelo utilizador.');
+      if (!(await confirmPullOverwrite('TUDO (agentes e skills)'))) {
         return;
       }
 
