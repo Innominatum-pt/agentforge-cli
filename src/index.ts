@@ -18,6 +18,8 @@ import { initWorkspace } from "./commands/initWorkspace";
 import { showManual } from "./commands/showManual";
 import { deploySkill } from "./commands/deploySkill";
 import { deployAgent } from "./commands/deployAgent";
+import { deployAllAgents } from "./commands/deployAllAgents";
+import { deployAllSkills } from "./commands/deployAllSkills";
 import { deployContextFiles } from "./commands/deployContextFiles";
 import { buildMemoryPathMap, reconstructExtractedContextFiles } from "./sync/pullAgentSync";
 
@@ -114,42 +116,6 @@ deployCmd
     await deployAgent(slug, config);
   });
 
-
-async function deployAllAgents(config: any, basePath: string) {
-  const agentsDir = path.join(basePath, "agents");
-  if (await fs.pathExists(agentsDir)) {
-    const agents = await fs.readdir(agentsDir);
-    logger.info(`🚀 Iniciando deploy em lote de ${agents.length} agentes...`);
-    for (const slug of agents) {
-      const agentPath = path.join(agentsDir, slug);
-      if ((await fs.stat(agentPath)).isDirectory()) {
-         await deployAgent(slug, config);
-      }
-    }
-  } else {
-    logger.info("Nenhum agente encontrado em agents/.");
-  }
-}
-
-async function deployAllSkills(config: any, basePath: string) {
-  const skillsDir = path.join(basePath, "skills");
-  if (await fs.pathExists(skillsDir)) {
-    const skills = await fs.readdir(skillsDir);
-    logger.info(`🚀 Iniciando deploy em lote de skills...`);
-    for (const item of skills) {
-      const itemPath = path.join(skillsDir, item);
-      if ((await fs.stat(itemPath)).isDirectory()) {
-        if (item === "system") {
-          logger.info("⏩ Ignorando pasta 'system/' (skills nativas do GoClaw são apenas de leitura)");
-          continue;
-        }
-        await deploySkill(item, config, basePath);
-      }
-    }
-  } else {
-    logger.info("Nenhuma skill encontrada em skills/.");
-  }
-}
 
 deployCmd
   .command("agents")
