@@ -12,7 +12,7 @@ describe("logger migration regression guard for pull skills command", () => {
     const region = sliceBetween(
       indexSource,
       'pullCmd\n  .command("skills")',
-      "async function pullAgent"
+      'pullCmd\n  .command("agents")'
     );
 
     expectNoDirectConsole(region);

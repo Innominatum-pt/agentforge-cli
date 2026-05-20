@@ -17,7 +17,7 @@ import { createNewSkill } from "./commands/newSkill";
 import { initWorkspace } from "./commands/initWorkspace";
 import { showManual } from "./commands/showManual";
 import { registerDeployCommands } from "./commands/registerDeployCommands";
-import { buildMemoryPathMap, reconstructExtractedContextFiles } from "./sync/pullAgentSync";
+import { pullAgent } from "./commands/pullAgent";
 
 const program = new Command();
 
@@ -185,51 +185,6 @@ pullCmd
       }
     }
   });
-
-async function pullAgent(slug: string, agentId: string, config: any) {
-  logger.info(`📦 Baixando agente: ${slug}...`);
-  
-  const client = createGoclawClientFromConfig(config);
-  const exportStream = await client.exportAgentArchive(agentId);
-
-  const tempTarPath = path.join(getWorkspaceRoot(), `temp_agent_${slug}.tar.gz`);
-
-  try {
-    const writer = fs.createWriteStream(tempTarPath);
-    (exportStream as any).pipe(writer);
-
-    await new Promise((resolve, reject) => {
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
-
-    const agentPath = path.join(getWorkspaceRoot(), "agents", slug);
-    if (await fs.pathExists(agentPath)) {
-      await fs.emptyDir(agentPath);
-    } else {
-      await fs.ensureDir(agentPath);
-    }
-
-    // Obter os caminhos reais (com barras) da API para reverter o flattening do export
-    const memoryDocs = await client.listMemoryDocuments(agentId);
-    const pathMap = buildMemoryPathMap(memoryDocs);
-
-    await tar.x({
-      file: tempTarPath,
-      cwd: agentPath,
-      strip: 0,
-      filter: (path) => {
-        return path === 'agent.json' || path.startsWith('context_files/');
-      }
-    });
-    
-    await reconstructExtractedContextFiles(agentPath, pathMap);
-  } finally {
-    if (await fs.pathExists(tempTarPath)) {
-      await fs.remove(tempTarPath);
-    }
-  }
-}
 
 pullCmd
   .command("agents")
