@@ -5,9 +5,9 @@ import { logger } from "../core/logger";
 import { getWorkspaceRoot } from "../core/workspace";
 import { getRequiredGoclawConfig, GoclawAuthMessages } from "../core/auth";
 import { confirmPullOverwrite } from "./pullConfirmation";
-import { pullAllSkills } from "./pullAllSkills";
 import { pullAllAgents } from "./pullAllAgents";
 import { runPullAll } from "./runPullAll";
+import { runPullSkills } from "./runPullSkills";
 
 export function registerPullCommands(program: Command): void {
   const pullCmd = program
@@ -24,17 +24,7 @@ export function registerPullCommands(program: Command): void {
         return;
       }
 
-      try {
-        await pullAllSkills(config);
-        logger.info("✅ Pull de skills concluído com sucesso! As skills foram atualizadas localmente.");
-      } catch (error: any) {
-        logger.error("❌ Erro durante o pull das skills:");
-        if (error.response?.status || error.status) {
-          logger.error(`Status HTTP ${error.response?.status || error.status}`);
-        } else {
-          logger.error(error.responseData || error.response?.data || error.message);
-        }
-      }
+      await runPullSkills(config);
     });
 
   pullCmd

@@ -27,6 +27,10 @@ vi.mock("./runPullAll", () => ({
   runPullAll: vi.fn(),
 }));
 
+vi.mock("./runPullSkills", () => ({
+  runPullSkills: vi.fn(),
+}));
+
 vi.mock("../core/logger", () => ({
   logger: {
     info: vi.fn(),
@@ -48,6 +52,7 @@ import { confirmPullOverwrite } from "./pullConfirmation";
 import { pullAllSkills } from "./pullAllSkills";
 import { pullAllAgents } from "./pullAllAgents";
 import { runPullAll } from "./runPullAll";
+import { runPullSkills } from "./runPullSkills";
 import { logger } from "../core/logger";
 import fs from "fs-extra";
 
@@ -129,40 +134,25 @@ describe("registerPullCommands", () => {
     expect(pullAllSkills).not.toHaveBeenCalled();
   });
 
-  it("pull skills wrapper calls pullAllSkills(config) on confirmation", async () => {
+  it("pull skills wrapper calls runPullSkills(config) on confirmation", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
     (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (runPullSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "skills"]);
 
-    expect(pullAllSkills).toHaveBeenCalledWith({ goclaw: { token: "t" } });
+    expect(runPullSkills).toHaveBeenCalledWith({ goclaw: { token: "t" } });
   });
 
-  it("pull skills wrapper logs final success message", async () => {
+  it("pull skills wrapper cancellation does not call runPullSkills", async () => {
     (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
     const pullCmd = program.commands.find((c) => c.name() === "pull")!;
     await pullCmd.parseAsync(["node", "script", "skills"]);
 
-    expect(logger.info).toHaveBeenCalledWith(
-      "✅ Pull de skills concluído com sucesso! As skills foram atualizadas localmente."
-    );
-  });
-
-  it("pull skills wrapper on HTTP error logs correct status line", async () => {
-    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ goclaw: { token: "t" } });
-    (confirmPullOverwrite as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-    (pullAllSkills as ReturnType<typeof vi.fn>).mockRejectedValue({ response: { status: 403 } });
-
-    const pullCmd = program.commands.find((c) => c.name() === "pull")!;
-    await pullCmd.parseAsync(["node", "script", "skills"]);
-
-    expect(logger.error).toHaveBeenCalledWith("❌ Erro durante o pull das skills:");
-    expect(logger.error).toHaveBeenCalledWith("Status HTTP 403");
+    expect(runPullSkills).not.toHaveBeenCalled();
   });
 
   it("pull agents wrapper validates missing token with exact error and process.exit(1)", async () => {
