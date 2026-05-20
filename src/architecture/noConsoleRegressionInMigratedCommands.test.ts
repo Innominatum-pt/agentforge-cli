@@ -30,7 +30,7 @@ describe("logger migration regression guard", () => {
     const region = sliceBetween(
       indexSource,
       "const buildCmd = program",
-      "const deployCmd = program"
+      "registerDeployCommands(program);"
     );
     expectNoDirectConsole(region);
   });
